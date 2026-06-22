@@ -57,3 +57,10 @@ dotnet_diagnostic.CA1062.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.CA1515.severity = none
+
+# EF Core generated migrations — exempt from style/quality enforcement.
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.IDE0161.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1062.severity = none
