@@ -1,0 +1,7 @@
+﻿services:
+  stayflow.api:
+    image: stayflow.api
+    build:
+      context: .
+      dockerfile: StayFlow.Api/Dockerfile
+

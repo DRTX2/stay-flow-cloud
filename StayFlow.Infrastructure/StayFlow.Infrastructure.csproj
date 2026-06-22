@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <ItemGroup>
+        <ProjectReference Include="..\StayFlow.Application\StayFlow.Application.csproj" />
+    </ItemGroup>
+
+</Project>

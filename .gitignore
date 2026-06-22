@@ -1,0 +1,34 @@
+# Build output
+bin/
+obj/
+/packages/
+artifacts/
+publish/
+
+# Test / coverage output
+[Tt]est[Rr]esults/
+*.coverage
+*.cobertura.xml
+coverage*.json
+coverage*.xml
+*.trx
+
+# Rider / ReSharper
+.idea/
+riderModule.iml
+/_ReSharper.Caches/
+*.DotSettings.user
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets / env
+*.env
+.env
+appsettings.*.local.json
