@@ -3,6 +3,9 @@
     <PropertyGroup>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
+        <!-- Test conventions: underscore method names (CA1707), no ConfigureAwait (CA2007),
+             inline literal arrays in [InlineData]/assertions (CA1861). -->
+        <NoWarn>$(NoWarn);CA1707;CA2007;CA1861</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
