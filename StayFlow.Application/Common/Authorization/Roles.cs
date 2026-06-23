@@ -18,6 +18,8 @@ public static class Roles
             Permissions.RoomsRead, Permissions.RoomsManage,
             Permissions.GuestsRead, Permissions.GuestsManage,
             Permissions.ReservationsRead, Permissions.ReservationsManage, Permissions.ReservationsCheckInOut,
+            Permissions.ServicesRead, Permissions.ServicesManage,
+            Permissions.BillingRead, Permissions.BillingManage,
             Permissions.AnalyticsView,
         ],
         [Manager] =
@@ -25,6 +27,8 @@ public static class Roles
             Permissions.RoomsRead, Permissions.RoomsManage,
             Permissions.GuestsRead, Permissions.GuestsManage,
             Permissions.ReservationsRead, Permissions.ReservationsManage, Permissions.ReservationsCheckInOut,
+            Permissions.ServicesRead, Permissions.ServicesManage,
+            Permissions.BillingRead, Permissions.BillingManage,
             Permissions.AnalyticsView,
         ],
         [Receptionist] =
@@ -32,6 +36,8 @@ public static class Roles
             Permissions.RoomsRead,
             Permissions.GuestsRead, Permissions.GuestsManage,
             Permissions.ReservationsRead, Permissions.ReservationsManage, Permissions.ReservationsCheckInOut,
+            Permissions.ServicesRead,
+            Permissions.BillingRead, Permissions.BillingManage,
         ],
         [Housekeeping] =
         [
@@ -41,6 +47,7 @@ public static class Roles
         [Customer] =
         [
             Permissions.ReservationsRead,
+            Permissions.BillingRead,
         ],
     };
 

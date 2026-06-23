@@ -69,5 +69,15 @@ public sealed class ReservationsController : ApiControllerBase
         return NoContent();
     }
 
+    [HttpPost("{id:guid}/charges")]
+    [Authorize(Policy = Permissions.ReservationsManage)]
+    public async Task<IActionResult> AddCharge(Guid id, [FromBody] AddChargeBody body)
+    {
+        var chargeId = await Sender.Send(new AddReservationChargeCommand(id, body.ServiceItemId, body.Quantity));
+        return CreatedAtAction(nameof(GetById), new { id }, new { chargeId });
+    }
+
     public sealed record CancelReservationBody(string? Reason);
+
+    public sealed record AddChargeBody(Guid ServiceItemId, int Quantity = 1);
 }

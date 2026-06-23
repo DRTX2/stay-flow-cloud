@@ -16,6 +16,12 @@ public static class Permissions
     public const string ReservationsManage = "reservations:manage";
     public const string ReservationsCheckInOut = "reservations:checkinout";
 
+    public const string ServicesRead = "services:read";
+    public const string ServicesManage = "services:manage";
+
+    public const string BillingRead = "billing:read";
+    public const string BillingManage = "billing:manage";
+
     public const string AnalyticsView = "analytics:view";
 
     /// <summary>Platform-level: manage tenants. Reserved for the super-admin.</summary>
@@ -26,6 +32,8 @@ public static class Permissions
         RoomsRead, RoomsManage,
         GuestsRead, GuestsManage,
         ReservationsRead, ReservationsManage, ReservationsCheckInOut,
+        ServicesRead, ServicesManage,
+        BillingRead, BillingManage,
         AnalyticsView,
         TenantsManage,
     ];

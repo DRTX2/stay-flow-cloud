@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using StayFlow.Domain.Billing;
 using StayFlow.Domain.Guests;
 using StayFlow.Domain.Reservations;
 using StayFlow.Domain.Rooms;
+using StayFlow.Domain.Services;
 using StayFlow.Domain.Tenants;
 
 namespace StayFlow.Application.Common.Abstractions;
@@ -18,6 +20,9 @@ public interface IApplicationDbContext
     DbSet<Room> Rooms { get; }
     DbSet<Guest> Guests { get; }
     DbSet<Reservation> Reservations { get; }
+    DbSet<ServiceItem> ServiceItems { get; }
+    DbSet<ReservationCharge> ReservationCharges { get; }
+    DbSet<Invoice> Invoices { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

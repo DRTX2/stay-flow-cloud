@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using StayFlow.Application.Common.Abstractions;
+using StayFlow.Domain.Billing;
 using StayFlow.Domain.Guests;
 using StayFlow.Domain.Reservations;
 using StayFlow.Domain.Rooms;
+using StayFlow.Domain.Services;
 using StayFlow.Domain.Tenants;
 using StayFlow.Persistence.Identity;
 
@@ -32,6 +34,9 @@ public sealed class StayFlowDbContext : IdentityDbContext<ApplicationUser, Appli
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<Guest> Guests => Set<Guest>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
+    public DbSet<ServiceItem> ServiceItems => Set<ServiceItem>();
+    public DbSet<ReservationCharge> ReservationCharges => Set<ReservationCharge>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -43,5 +48,8 @@ public sealed class StayFlowDbContext : IdentityDbContext<ApplicationUser, Appli
         builder.Entity<Room>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
         builder.Entity<Guest>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
         builder.Entity<Reservation>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<ServiceItem>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<ReservationCharge>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<Invoice>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
     }
 }
