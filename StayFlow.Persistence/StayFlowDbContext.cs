@@ -1,18 +1,21 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Domain.Guests;
 using StayFlow.Domain.Reservations;
 using StayFlow.Domain.Rooms;
 using StayFlow.Domain.Tenants;
+using StayFlow.Persistence.Identity;
 
 namespace StayFlow.Persistence;
 
 /// <summary>
-/// The application's EF Core context. Enforces multi-tenant isolation and soft-delete via
-/// global query filters keyed off the per-request tenant. Auditing, tenant stamping and
-/// domain-event dispatch are applied by registered save interceptors.
+/// The application's EF Core context. Hosts the business model, ASP.NET Identity, and the
+/// OpenIddict stores. Enforces multi-tenant isolation and soft-delete via global query filters
+/// keyed off the per-request tenant. Auditing, tenant stamping and domain-event dispatch are
+/// applied by registered save interceptors.
 /// </summary>
-public sealed class StayFlowDbContext : DbContext, IApplicationDbContext
+public sealed class StayFlowDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>, IApplicationDbContext
 {
     private readonly Guid _tenantId;
 
@@ -30,15 +33,15 @@ public sealed class StayFlowDbContext : DbContext, IApplicationDbContext
     public DbSet<Guest> Guests => Set<Guest>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(modelBuilder);
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(StayFlowDbContext).Assembly);
+        base.OnModelCreating(builder);
+        builder.ApplyConfigurationsFromAssembly(typeof(StayFlowDbContext).Assembly);
 
         // Tenant isolation + soft delete. Tenant itself is not tenant-scoped.
-        modelBuilder.Entity<RoomType>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
-        modelBuilder.Entity<Room>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
-        modelBuilder.Entity<Guest>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
-        modelBuilder.Entity<Reservation>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<RoomType>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<Room>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<Guest>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<Reservation>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
     }
 }

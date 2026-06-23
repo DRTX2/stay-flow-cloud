@@ -1,7 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\StayFlow.Application\StayFlow.Application.csproj" />
+        <ProjectReference Include="..\StayFlow.Persistence\StayFlow.Persistence.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="OpenIddict.AspNetCore" />
     </ItemGroup>
 
 </Project>

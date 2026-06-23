@@ -26,22 +26,21 @@ public sealed class GetRoomsHandler(IApplicationDbContext dbContext)
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .Join(
-                dbContext.RoomTypes,
-                room => room.RoomTypeId,
-                roomType => roomType.Id,
-                (room, roomType) => new RoomDto(
-                    room.Id,
-                    room.Number,
-                    room.RoomTypeId,
-                    roomType.Name,
-                    room.BasePrice,
-                    room.Capacity,
-                    room.Floor,
-                    room.Status))
-            .OrderBy(dto => dto.Number)
+            .OrderBy(room => room.Number)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(room => new RoomDto(
+                room.Id,
+                room.Number,
+                room.RoomTypeId,
+                dbContext.RoomTypes
+                    .Where(roomType => roomType.Id == room.RoomTypeId)
+                    .Select(roomType => roomType.Name)
+                    .FirstOrDefault()!,
+                room.BasePrice,
+                room.Capacity,
+                room.Floor,
+                room.Status))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<RoomDto>(items, page, pageSize, totalCount);

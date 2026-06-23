@@ -19,6 +19,10 @@ public static class DependencyInjection
                 npgsql.MigrationsAssembly(typeof(StayFlowDbContext).Assembly.FullName);
                 npgsql.EnableRetryOnFailure();
             });
+
+            // Register the OpenIddict entity sets (applications, authorizations, scopes, tokens).
+            options.UseOpenIddict();
+
             options.AddInterceptors(
                 serviceProvider.GetRequiredService<AuditableEntityInterceptor>(),
                 serviceProvider.GetRequiredService<DispatchDomainEventsInterceptor>());

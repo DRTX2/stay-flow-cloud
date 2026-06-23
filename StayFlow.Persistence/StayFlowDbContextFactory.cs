@@ -15,9 +15,10 @@ public sealed class StayFlowDbContextFactory : IDesignTimeDbContextFactory<StayF
         var connectionString = Environment.GetEnvironmentVariable("STAYFLOW_DESIGNTIME_CONNECTION")
             ?? "Host=localhost;Port=5432;Database=stayflow;Username=postgres;Password=postgres";
 
-        var options = new DbContextOptionsBuilder<StayFlowDbContext>()
-            .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(StayFlowDbContextFactory).Assembly.FullName))
-            .Options;
+        var optionsBuilder = new DbContextOptionsBuilder<StayFlowDbContext>()
+            .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(StayFlowDbContextFactory).Assembly.FullName));
+        optionsBuilder.UseOpenIddict();
+        var options = optionsBuilder.Options;
 
         return new StayFlowDbContext(options, new DesignTimeTenantProvider());
     }
