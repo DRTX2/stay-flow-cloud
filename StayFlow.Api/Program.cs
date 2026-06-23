@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi;
 using Serilog;
 using StayFlow.Api.Middleware;
+using StayFlow.Api.Observability;
 using StayFlow.Application;
 using StayFlow.Infrastructure;
 using StayFlow.Infrastructure.Auditing;
@@ -24,6 +25,7 @@ builder.Services.AddPersistence(connectionString);
 builder.Services.AddInfrastructure(builder.Environment.IsDevelopment());
 builder.Services.AddCaching(builder.Configuration.GetConnectionString("Redis"));
 builder.Services.AddAudit(builder.Configuration.GetConnectionString("Mongo"));
+builder.Services.AddObservability(builder.Configuration);
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -104,6 +106,7 @@ if (builder.Configuration.GetValue("RateLimiting:Enabled", true))
 app.UseSession();
 
 app.MapControllers();
+app.MapObservability();
 
 // Apply migrations and seed baseline data (clients, roles, admin, demo tenant) on startup.
 await app.Services.GetRequiredService<DataSeeder>().SeedAsync();
