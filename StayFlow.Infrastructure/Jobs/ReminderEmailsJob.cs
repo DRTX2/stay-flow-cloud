@@ -2,37 +2,49 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StayFlow.Application.Common.Abstractions;
+using StayFlow.Application.Common.Notifications;
 using StayFlow.Domain.Reservations;
 using StayFlow.Persistence;
 
 namespace StayFlow.Infrastructure.Jobs;
 
 /// <summary>
-/// Sends check-in reminders to guests arriving tomorrow. Currently logs the would-be recipients;
-/// the dispatch hook for a notification service (email/SMS/push) is marked below.
+/// Sends a check-in reminder to every guest arriving tomorrow, across all tenants.
 /// </summary>
 [AutomaticRetry(Attempts = 3)]
 public sealed class ReminderEmailsJob(
     StayFlowDbContext dbContext,
     IDateTimeProvider clock,
+    INotificationService notifications,
     ILogger<ReminderEmailsJob> logger)
 {
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var tomorrow = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime).AddDays(1);
 
-        var arriving = await dbContext.Reservations
+        var arrivals = await dbContext.Reservations
             .IgnoreQueryFilters()
-            .CountAsync(
-                reservation => !reservation.IsDeleted
-                    && reservation.Status == ReservationStatus.Confirmed
-                    && reservation.Period.CheckIn == tomorrow,
+            .Where(reservation => !reservation.IsDeleted
+                && reservation.Status == ReservationStatus.Confirmed
+                && reservation.Period.CheckIn == tomorrow)
+            .Join(
+                dbContext.Guests.IgnoreQueryFilters(),
+                reservation => reservation.GuestId,
+                guest => guest.Id,
+                (reservation, guest) => new { reservation.ConfirmationCode, guest.FirstName, guest.Email })
+            .ToListAsync(cancellationToken);
+
+        foreach (var arrival in arrivals)
+        {
+            await notifications.SendAsync(
+                new NotificationMessage(
+                    NotificationChannel.Email,
+                    arrival.Email,
+                    "Your stay starts tomorrow",
+                    $"Hi {arrival.FirstName}, this is a reminder for your reservation {arrival.ConfirmationCode}. We look forward to welcoming you."),
                 cancellationToken);
+        }
 
-        logger.LogInformation(
-            "Check-in reminders: {Count} guest(s) arriving {Date} would be notified",
-            arriving, tomorrow);
-
-        // TODO: enqueue one notification per reservation via an INotificationService.
+        logger.LogInformation("Check-in reminders: sent {Count} for {Date}", arrivals.Count, tomorrow);
     }
 }

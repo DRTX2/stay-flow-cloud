@@ -4,7 +4,9 @@ using OpenIddict.Abstractions;
 using OpenIddict.Validation.AspNetCore;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Application.Common.Authorization;
+using StayFlow.Application.Common.Notifications;
 using StayFlow.Infrastructure.Identity;
+using StayFlow.Infrastructure.Notifications;
 using StayFlow.Infrastructure.Tenancy;
 using StayFlow.Infrastructure.Time;
 using StayFlow.Persistence;
@@ -22,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantProvider, TenantProvider>();
         services.AddScoped<IFeatureService, FeatureService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+        services.AddSingleton<INotificationService, LoggingNotificationService>();
         services.AddSingleton<DataSeeder>();
 
         services.AddIdentityCore<ApplicationUser>(options =>
