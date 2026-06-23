@@ -16,6 +16,9 @@
         <PackageReference Include="StackExchange.Redis" />
         <PackageReference Include="MongoDB.Driver" />
         <PackageReference Include="MassTransit" />
+        <PackageReference Include="Hangfire.AspNetCore" />
+        <PackageReference Include="Hangfire.Core" />
+        <PackageReference Include="Hangfire.PostgreSql" />
     </ItemGroup>
 
 </Project>

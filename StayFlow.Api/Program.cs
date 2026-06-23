@@ -9,6 +9,7 @@ using StayFlow.Infrastructure;
 using StayFlow.Infrastructure.Auditing;
 using StayFlow.Infrastructure.Caching;
 using StayFlow.Infrastructure.Identity;
+using StayFlow.Infrastructure.Jobs;
 using StayFlow.Infrastructure.Messaging;
 using StayFlow.Persistence;
 
@@ -28,6 +29,7 @@ builder.Services.AddCaching(builder.Configuration.GetConnectionString("Redis"));
 builder.Services.AddAudit(builder.Configuration.GetConnectionString("Mongo"));
 builder.Services.AddObservability(builder.Configuration);
 builder.Services.AddMessaging();
+builder.Services.AddBackgroundJobs(connectionString);
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -109,6 +111,7 @@ app.UseSession();
 
 app.MapControllers();
 app.MapObservability();
+app.UseBackgroundJobs();
 
 // Apply migrations and seed baseline data (clients, roles, admin, demo tenant) on startup.
 await app.Services.GetRequiredService<DataSeeder>().SeedAsync();
