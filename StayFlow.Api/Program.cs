@@ -11,6 +11,7 @@ using StayFlow.Infrastructure.Caching;
 using StayFlow.Infrastructure.Identity;
 using StayFlow.Infrastructure.Jobs;
 using StayFlow.Infrastructure.Messaging;
+using StayFlow.Infrastructure.Storage;
 using StayFlow.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,6 +31,7 @@ builder.Services.AddAudit(builder.Configuration.GetConnectionString("Mongo"));
 builder.Services.AddObservability(builder.Configuration);
 builder.Services.AddMessaging();
 builder.Services.AddBackgroundJobs(connectionString);
+builder.Services.AddDocumentStorage(builder.Configuration);
 
 builder.Services.AddRateLimiter(options =>
 {
