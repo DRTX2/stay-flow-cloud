@@ -8,6 +8,7 @@ using StayFlow.Domain.Rooms;
 using StayFlow.Domain.Services;
 using StayFlow.Domain.Tenants;
 using StayFlow.Persistence.Identity;
+using StayFlow.Persistence.Outbox;
 
 namespace StayFlow.Persistence;
 
@@ -38,6 +39,7 @@ public sealed class StayFlowDbContext : IdentityDbContext<ApplicationUser, Appli
     public DbSet<ReservationCharge> ReservationCharges => Set<ReservationCharge>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<TenantFeatureOverride> TenantFeatureOverrides => Set<TenantFeatureOverride>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

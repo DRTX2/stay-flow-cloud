@@ -10,6 +10,7 @@ public static class DependencyInjection
     public static IServiceCollection AddPersistence(this IServiceCollection services, string connectionString)
     {
         services.AddScoped<AuditableEntityInterceptor>();
+        services.AddScoped<ConvertDomainEventsToOutboxInterceptor>();
         services.AddScoped<DispatchDomainEventsInterceptor>();
 
         services.AddDbContext<StayFlowDbContext>((serviceProvider, options) =>
@@ -25,6 +26,7 @@ public static class DependencyInjection
 
             options.AddInterceptors(
                 serviceProvider.GetRequiredService<AuditableEntityInterceptor>(),
+                serviceProvider.GetRequiredService<ConvertDomainEventsToOutboxInterceptor>(),
                 serviceProvider.GetRequiredService<DispatchDomainEventsInterceptor>());
         });
 

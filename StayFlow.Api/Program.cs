@@ -9,6 +9,7 @@ using StayFlow.Infrastructure;
 using StayFlow.Infrastructure.Auditing;
 using StayFlow.Infrastructure.Caching;
 using StayFlow.Infrastructure.Identity;
+using StayFlow.Infrastructure.Messaging;
 using StayFlow.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +27,7 @@ builder.Services.AddInfrastructure(builder.Environment.IsDevelopment());
 builder.Services.AddCaching(builder.Configuration.GetConnectionString("Redis"));
 builder.Services.AddAudit(builder.Configuration.GetConnectionString("Mongo"));
 builder.Services.AddObservability(builder.Configuration);
+builder.Services.AddMessaging();
 
 builder.Services.AddRateLimiter(options =>
 {
