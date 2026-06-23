@@ -52,6 +52,9 @@ dotnet_naming_style.underscore_prefix.capitalization = camel_case
 dotnet_diagnostic.CA1515.severity = none
 dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.CA1062.severity = none
+# High-performance logging (LoggerMessage source-gen) is overkill for non-hot-path app code.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
 
 [**/StayFlow.{UnitTests,IntegrationTests}/**.cs]
 dotnet_diagnostic.CA1707.severity = none

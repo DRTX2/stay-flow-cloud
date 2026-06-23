@@ -1,0 +1,49 @@
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using StayFlow.Application.Common.Abstractions;
+using StayFlow.Application.Common.Models;
+using StayFlow.Domain.Rooms;
+
+namespace StayFlow.Application.Features.Rooms.Queries;
+
+public sealed record GetRoomsQuery(int Page = 1, int PageSize = 20, RoomStatus? Status = null)
+    : IRequest<PagedResult<RoomDto>>;
+
+public sealed class GetRoomsHandler(IApplicationDbContext dbContext)
+    : IRequestHandler<GetRoomsQuery, PagedResult<RoomDto>>
+{
+    public async Task<PagedResult<RoomDto>> Handle(GetRoomsQuery request, CancellationToken cancellationToken)
+    {
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 100);
+
+        var query = dbContext.Rooms.AsNoTracking();
+        if (request.Status is { } status)
+        {
+            query = query.Where(r => r.Status == status);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Join(
+                dbContext.RoomTypes,
+                room => room.RoomTypeId,
+                roomType => roomType.Id,
+                (room, roomType) => new RoomDto(
+                    room.Id,
+                    room.Number,
+                    room.RoomTypeId,
+                    roomType.Name,
+                    room.BasePrice,
+                    room.Capacity,
+                    room.Floor,
+                    room.Status))
+            .OrderBy(dto => dto.Number)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<RoomDto>(items, page, pageSize, totalCount);
+    }
+}
