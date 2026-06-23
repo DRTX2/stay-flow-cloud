@@ -24,6 +24,9 @@ public static class Permissions
 
     public const string AnalyticsView = "analytics:view";
 
+    /// <summary>Manage the tenant's own feature flags (within plan availability).</summary>
+    public const string FeaturesManage = "features:manage";
+
     /// <summary>Platform-level: manage tenants. Reserved for the super-admin.</summary>
     public const string TenantsManage = "tenants:manage";
 
@@ -35,6 +38,7 @@ public static class Permissions
         ServicesRead, ServicesManage,
         BillingRead, BillingManage,
         AnalyticsView,
+        FeaturesManage,
         TenantsManage,
     ];
 

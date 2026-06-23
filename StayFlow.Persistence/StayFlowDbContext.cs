@@ -37,6 +37,7 @@ public sealed class StayFlowDbContext : IdentityDbContext<ApplicationUser, Appli
     public DbSet<ServiceItem> ServiceItems => Set<ServiceItem>();
     public DbSet<ReservationCharge> ReservationCharges => Set<ReservationCharge>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<TenantFeatureOverride> TenantFeatureOverrides => Set<TenantFeatureOverride>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -51,5 +52,6 @@ public sealed class StayFlowDbContext : IdentityDbContext<ApplicationUser, Appli
         builder.Entity<ServiceItem>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
         builder.Entity<ReservationCharge>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
         builder.Entity<Invoice>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<TenantFeatureOverride>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
     }
 }

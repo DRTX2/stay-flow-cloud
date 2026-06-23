@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Application.Common.Exceptions;
 using StayFlow.Domain.Rooms;
+using StayFlow.Domain.Tenants;
 using ValidationException = StayFlow.Application.Common.Exceptions.ValidationException;
 
 namespace StayFlow.Application.Features.Rooms.Commands;
@@ -27,7 +28,7 @@ public sealed class CreateRoomValidator : AbstractValidator<CreateRoomCommand>
     }
 }
 
-public sealed class CreateRoomHandler(IApplicationDbContext dbContext)
+public sealed class CreateRoomHandler(IApplicationDbContext dbContext, IFeatureService features)
     : IRequestHandler<CreateRoomCommand, Guid>
 {
     public async Task<Guid> Handle(CreateRoomCommand request, CancellationToken cancellationToken)
@@ -45,6 +46,21 @@ public sealed class CreateRoomHandler(IApplicationDbContext dbContext)
             [
                 new FluentValidation.Results.ValidationFailure(nameof(request.Number), $"Room number '{request.Number}' already exists."),
             ]);
+        }
+
+        // Enforce the subscription plan's room cap.
+        var limits = await features.GetLimitsAsync(cancellationToken);
+        if (limits.MaxRooms != PlanLimits.Unlimited)
+        {
+            var roomCount = await dbContext.Rooms.CountAsync(cancellationToken);
+            if (roomCount >= limits.MaxRooms)
+            {
+                throw new ValidationException(
+                [
+                    new FluentValidation.Results.ValidationFailure(
+                        "Plan", $"Your plan allows at most {limits.MaxRooms} rooms. Upgrade to add more."),
+                ]);
+            }
         }
 
         var room = Room.Create(request.Number, request.RoomTypeId, request.BasePrice, request.Capacity, request.Floor);

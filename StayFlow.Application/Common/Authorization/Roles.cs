@@ -21,6 +21,7 @@ public static class Roles
             Permissions.ServicesRead, Permissions.ServicesManage,
             Permissions.BillingRead, Permissions.BillingManage,
             Permissions.AnalyticsView,
+            Permissions.FeaturesManage,
         ],
         [Manager] =
         [

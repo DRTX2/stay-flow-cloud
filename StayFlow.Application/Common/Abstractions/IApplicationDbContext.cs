@@ -23,6 +23,7 @@ public interface IApplicationDbContext
     DbSet<ServiceItem> ServiceItems { get; }
     DbSet<ReservationCharge> ReservationCharges { get; }
     DbSet<Invoice> Invoices { get; }
+    DbSet<TenantFeatureOverride> TenantFeatureOverrides { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

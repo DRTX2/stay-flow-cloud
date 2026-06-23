@@ -20,6 +20,7 @@ public static class DependencyInjection
 
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<ITenantProvider, TenantProvider>();
+        services.AddScoped<IFeatureService, FeatureService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddSingleton<DataSeeder>();
 
