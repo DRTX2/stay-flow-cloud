@@ -14,4 +14,12 @@
         <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     </PropertyGroup>
 
+    <ItemGroup Label="NuGet audit suppressions">
+        <!-- SharpCompress / Snappier come in transitively via MongoDB.Driver's optional wire-
+             compression support, which StayFlow does not enable. No fixed versions are published
+             for these advisories; suppressed with justification rather than masking all audits. -->
+        <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-6c8g-7p36-r338" />
+        <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-pggp-6c3x-2xmx" />
+    </ItemGroup>
+
 </Project>

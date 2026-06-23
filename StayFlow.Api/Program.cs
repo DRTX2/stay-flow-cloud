@@ -5,6 +5,7 @@ using Serilog;
 using StayFlow.Api.Middleware;
 using StayFlow.Application;
 using StayFlow.Infrastructure;
+using StayFlow.Infrastructure.Auditing;
 using StayFlow.Infrastructure.Caching;
 using StayFlow.Infrastructure.Identity;
 using StayFlow.Persistence;
@@ -22,6 +23,7 @@ builder.Services.AddApplication();
 builder.Services.AddPersistence(connectionString);
 builder.Services.AddInfrastructure(builder.Environment.IsDevelopment());
 builder.Services.AddCaching(builder.Configuration.GetConnectionString("Redis"));
+builder.Services.AddAudit(builder.Configuration.GetConnectionString("Mongo"));
 
 builder.Services.AddRateLimiter(options =>
 {
