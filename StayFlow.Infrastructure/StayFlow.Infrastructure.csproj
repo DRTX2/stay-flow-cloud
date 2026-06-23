@@ -11,6 +11,9 @@
 
     <ItemGroup>
         <PackageReference Include="OpenIddict.AspNetCore" />
+        <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+        <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" />
+        <PackageReference Include="StackExchange.Redis" />
     </ItemGroup>
 
 </Project>

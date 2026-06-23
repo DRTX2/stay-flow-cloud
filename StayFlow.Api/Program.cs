@@ -1,8 +1,11 @@
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi;
 using Serilog;
 using StayFlow.Api.Middleware;
 using StayFlow.Application;
 using StayFlow.Infrastructure;
+using StayFlow.Infrastructure.Caching;
 using StayFlow.Infrastructure.Identity;
 using StayFlow.Persistence;
 
@@ -18,6 +21,35 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 builder.Services.AddApplication();
 builder.Services.AddPersistence(connectionString);
 builder.Services.AddInfrastructure(builder.Environment.IsDevelopment());
+builder.Services.AddCaching(builder.Configuration.GetConnectionString("Redis"));
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Default budget per tenant (falls back to client IP), keeps a noisy tenant from
+    // starving others. A tighter named policy protects the token endpoint from brute force.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst("tenant_id")?.Value
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "anonymous",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 100, Window = TimeSpan.FromSeconds(10), QueueLimit = 0 }));
+
+    options.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.PermitLimit = 5;
+        limiter.Window = TimeSpan.FromSeconds(10);
+        limiter.QueueLimit = 0;
+    });
+});
+
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(20);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -60,6 +92,14 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Rate limiting can be switched off (e.g. for integration tests that fetch tokens in a loop).
+if (builder.Configuration.GetValue("RateLimiting:Enabled", true))
+{
+    app.UseRateLimiter();
+}
+
+app.UseSession();
 
 app.MapControllers();
 

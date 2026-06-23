@@ -26,5 +26,6 @@ public sealed class StayFlowApiFactory : WebApplicationFactory<Program>, IAsyncL
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:Default", _database.GetConnectionString());
+        builder.UseSetting("RateLimiting:Enabled", "false");
     }
 }

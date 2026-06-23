@@ -1,6 +1,7 @@
 using FluentValidation;
 using MediatR;
 using StayFlow.Application.Common.Abstractions;
+using StayFlow.Application.Features.RoomTypes.Queries;
 using StayFlow.Domain.Rooms;
 
 namespace StayFlow.Application.Features.RoomTypes.Commands;
@@ -22,7 +23,10 @@ public sealed class CreateRoomTypeValidator : AbstractValidator<CreateRoomTypeCo
     }
 }
 
-public sealed class CreateRoomTypeHandler(IApplicationDbContext dbContext)
+public sealed class CreateRoomTypeHandler(
+    IApplicationDbContext dbContext,
+    ICacheService cache,
+    ITenantProvider tenantProvider)
     : IRequestHandler<CreateRoomTypeCommand, Guid>
 {
     public async Task<Guid> Handle(CreateRoomTypeCommand request, CancellationToken cancellationToken)
@@ -30,6 +34,9 @@ public sealed class CreateRoomTypeHandler(IApplicationDbContext dbContext)
         var roomType = RoomType.Create(request.Name, request.BaseRate, request.MaxOccupancy, request.Description);
         dbContext.RoomTypes.Add(roomType);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Invalidate the tenant's cached room-type list.
+        await cache.RemoveAsync(GetRoomTypesHandler.CacheKey(tenantProvider.TenantId), cancellationToken);
 
         return roomType.Id;
     }

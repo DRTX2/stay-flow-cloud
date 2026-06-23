@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using StayFlow.Application.Common.Authorization;
@@ -24,6 +25,7 @@ public sealed class AuthController(
     RoleManager<ApplicationRole> roleManager) : ControllerBase
 {
     [HttpPost("~/connect/token"), Produces("application/json")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Exchange()
     {
         var request = HttpContext.GetOpenIddictServerRequest()
