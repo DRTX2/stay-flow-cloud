@@ -31,7 +31,7 @@ microservices.
 
 ```
 backend/     ASP.NET Core solution (StayFlowCloud.sln) — see Architecture below
-frontend/    React + TypeScript SPA (in progress)
+frontend/    React + TypeScript SPA (Vite, OAuth2 PKCE) — see frontend/README.md
 deploy/       Terraform (AWS), Prometheus/Grafana provisioning
 docs/         Architecture notes and the improvement analysis
 compose.yaml  Full local stack (API + Postgres + Redis + Mongo + Prometheus + Grafana)
@@ -182,6 +182,17 @@ dotnet run --project backend/StayFlow.Api
 EF migrations apply automatically on startup; data is seeded (roles, permissions, demo tenant, OAuth
 clients) on first run.
 
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
+```
+
+The SPA proxies API/auth calls to the backend on `:8080` (same-origin, no CORS). Sign in with the
+seeded `admin@stayflow.local` / `Admin123$`. See [`frontend/README.md`](frontend/README.md).
+
 ---
 
 ## Observability
@@ -254,7 +265,7 @@ See the [Terraform README](deploy/terraform/README.md) for backend, TLS and sizi
 
 ## Roadmap
 
-The backend, infrastructure and tooling are complete. Planned next steps are tracked in
-[`PENDING.md`](PENDING.md) and the improvement analysis — highlights: a React + TypeScript frontend
-with Playwright E2E, event-driven microservice extraction, semantic search (embeddings/RAG), and
-cloud networking hardening.
+Backend, frontend, infrastructure and tooling are in place. Planned next steps are tracked in
+[`PENDING.md`](PENDING.md) and the [improvement analysis](docs/IMPROVEMENTS.md) — highlights:
+Playwright E2E, event-driven microservice extraction, semantic search (embeddings/RAG), and cloud
+networking hardening.

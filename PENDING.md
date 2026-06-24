@@ -4,9 +4,9 @@ Snapshot of what remains after the backend/infra/tooling are complete.
 
 ## Not yet built
 
-- **React + TypeScript frontend** — the only major spec item still unbuilt. SPA OAuth client (`spa`)
-  and `http://localhost:5173/callback` redirect are already seeded server-side, so the API is ready.
-- **Playwright E2E** — deferred until the frontend exists.
+- **Playwright E2E** — frontend now exists (`frontend/`), so the E2E suite can be added next.
+- **Frontend depth** — the SPA covers auth + read views (dashboard, reservations, rooms, guests,
+  services, reports/CSV). Create/edit forms, the customer portal and pagination are still to add.
 
 ## Nice-to-have hardening
 
