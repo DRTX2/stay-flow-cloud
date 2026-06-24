@@ -4,9 +4,14 @@ Snapshot of what remains after the backend/infra/tooling are complete.
 
 ## Not yet built
 
-- **Playwright E2E** — frontend now exists (`frontend/`), so the E2E suite can be added next.
-- **Frontend depth** — the SPA covers auth + read views (dashboard, reservations, rooms, guests,
-  services, reports/CSV). Create/edit forms, the customer portal and pagination are still to add.
+- **Microservice extraction** — pull a bounded context (Notifications or Analytics) out of the
+  monolith as a standalone service over the existing outbox/integration events. This is the agreed
+  next step (`docs/IMPROVEMENTS.md §1`).
+- **Run Playwright E2E against a live stack** — specs exist (`frontend/e2e`: login, dashboard,
+  reservation lifecycle); wire them into CI with the backend + dev server running.
+- **Frontend depth** — the enterprise SPA covers auth, the executive dashboard and full CRUD-style
+  tables for every entity (create/cancel/invoice on reservations). Still to add: edit forms for the
+  other entities, the guest-facing customer portal, and server-side pagination for large datasets.
 
 ## Nice-to-have hardening
 
