@@ -17,3 +17,8 @@ dist-ssr
 
 # TS build info
 *.tsbuildinfo
+
+# Playwright
+playwright-report
+test-results
+.cache
