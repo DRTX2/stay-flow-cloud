@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Build context is the repository root (see compose.yaml), so COPY paths are repo-relative.
+# Build context is the backend/ directory (see compose.yaml), so COPY paths are backend-relative.
 
 # --- Build stage -----------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build

@@ -27,9 +27,23 @@ microservices.
 
 ---
 
+## Repository layout
+
+```
+backend/     ASP.NET Core solution (StayFlowCloud.sln) — see Architecture below
+frontend/    React + TypeScript SPA (in progress)
+deploy/       Terraform (AWS), Prometheus/Grafana provisioning
+docs/         Architecture notes and the improvement analysis
+compose.yaml  Full local stack (API + Postgres + Redis + Mongo + Prometheus + Grafana)
+```
+
+Each `backend/` and `frontend/` is independently buildable; the split is the first step toward
+extracting bounded contexts into standalone services later (see `docs/IMPROVEMENTS.md`).
+
 ## Architecture
 
-Clean Architecture with CQRS. Dependencies point inward; the domain knows nothing about EF, HTTP or AWS.
+Clean Architecture with CQRS (projects under `backend/`). Dependencies point inward; the domain knows
+nothing about EF, HTTP or AWS.
 
 ```
 StayFlow.Domain          Entities, value objects, domain events. No dependencies.
@@ -162,7 +176,7 @@ Backing services also publish their ports: PostgreSQL `5432`, Redis `6379`, Mong
 To run the API directly against your own infrastructure, set the connection strings and run:
 
 ```bash
-dotnet run --project StayFlow.Api
+dotnet run --project backend/StayFlow.Api
 ```
 
 EF migrations apply automatically on startup; data is seeded (roles, permissions, demo tenant, OAuth

@@ -42,7 +42,7 @@ services:
   stayflow.api:
     image: stayflow.api
     build:
-      context: .
+      context: ./backend
       dockerfile: StayFlow.Api/Dockerfile
     depends_on:
       postgres:
