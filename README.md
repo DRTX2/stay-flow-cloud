@@ -121,16 +121,16 @@ The seeded SPA client redirects to `http://localhost:5173/callback` and requires
 Representative resource endpoints (all tenant-scoped, permission-gated):
 
 ```
-GET    /api/reservations            POST /api/reservations
-GET    /api/rooms                   GET  /api/room-types
-GET    /api/guests                  POST /api/guests
-GET    /api/invoices
-GET    /api/services
-GET    /api/analytics/dashboard     GET  /api/analytics/revenue
-GET    /api/audit
-GET    /api/tenant-features
-POST   /api/documents               GET  /api/documents/{key}
-GET    /api/tenants                 POST /api/tenants
+GET    /api/v1/reservations         POST /api/v1/reservations
+GET    /api/v1/rooms                GET  /api/v1/roomtypes
+GET    /api/v1/guests               POST /api/v1/guests
+GET    /api/v1/invoices
+GET    /api/v1/services
+GET    /api/v1/analytics/dashboard  GET  /api/v1/analytics/revenue
+GET    /api/v1/audit
+GET    /api/v1/tenantfeatures
+POST   /api/v1/documents            GET  /api/v1/documents/{key}
+GET    /api/v1/tenants              POST /api/v1/tenants
 ```
 
 A contract test suite (`StayFlow.ContractTests`) pins the shape of the public surface so breaking
