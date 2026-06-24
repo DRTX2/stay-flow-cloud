@@ -63,11 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void (async () => {
       const current = loadTokens();
-      if (current && current.expiresAt <= Date.now() && current.refreshToken) {
-        try {
-          const next = await refreshTokens(current.refreshToken);
-          if (!cancelled) setSession(next);
-        } catch {
+      if (current && current.expiresAt <= Date.now()) {
+        if (current.refreshToken) {
+          try {
+            const next = await refreshTokens(current.refreshToken);
+            if (!cancelled) setSession(next);
+          } catch {
+            clearTokens();
+            if (!cancelled) setTokens(null);
+          }
+        } else {
+          // Expired and not refreshable — drop it so isAuthenticated is accurate.
           clearTokens();
           if (!cancelled) setTokens(null);
         }
@@ -101,7 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      isAuthenticated: Boolean(tokens) && tokens!.expiresAt > Date.now(),
+      // Expired-but-present tokens are cleared on mount / on a 401, so presence is sufficient
+      // here (avoids an impure Date.now() during render).
+      isAuthenticated: Boolean(tokens),
       isLoading,
       login,
       logout,

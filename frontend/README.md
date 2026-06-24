@@ -82,7 +82,8 @@ exchange needs no CORS. Sign in with the seeded `admin@stayflow.local` / `Admin1
 - **Reservations** — create (RHF + Zod validation), cancel (optimistic) and generate invoice, with
   toast feedback.
 - **Accessibility** — keyboard navigation, visible focus rings, labelled controls, semantic roles.
-- **Performance** — route-level code splitting, lazy loading, Suspense, manual vendor chunks.
+- **Performance** — the **React Compiler** (stable, React 19) auto-memoizes components, plus
+  route-level code splitting, lazy loading and Suspense. Built with Vite 8 (Rolldown).
 
 ## Testing
 
@@ -100,5 +101,5 @@ ESLint + Prettier enforce style. Husky runs `lint-staged` on pre-commit and `com
 git config core.hooksPath frontend/.husky
 ```
 
-> Note: the dev-only advisories reported by `npm audit` come from the Vite/Vitest dev server and test
-> runner; they are not part of the production bundle.
+The React Compiler ESLint rules (eslint-plugin-react-hooks v7) run as part of `npm run lint`, so
+purity/immutability violations are caught in CI. `npm audit` is clean.

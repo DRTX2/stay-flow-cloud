@@ -115,11 +115,11 @@ export function RevenueBarChart({ points }: { points: RevenuePoint[] }) {
 
 export function CumulativeRevenueLine({ points }: { points: RevenuePoint[] }) {
   const data = useMemo(() => {
-    let running = 0;
-    return toSeries(points).map((s) => {
-      running += s.amount;
-      return { label: s.label, total: running };
-    });
+    const series = toSeries(points);
+    return series.map((s, i) => ({
+      label: s.label,
+      total: series.slice(0, i + 1).reduce((sum, point) => sum + point.amount, 0),
+    }));
   }, [points]);
   return (
     <ResponsiveContainer width="100%" height={260}>

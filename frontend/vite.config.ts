@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
 import { fileURLToPath, URL } from "node:url";
 
 // The SPA runs on :5173 (the redirect URI seeded for the OpenIddict `stayflow-spa` client).
@@ -18,7 +19,12 @@ const proxy = Object.fromEntries(
 );
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // React Compiler (stable in React 19) auto-memoizes components, so most manual
+    // useMemo/useCallback/React.memo is no longer needed.
+    babel({ presets: [reactCompilerPreset()] }),
+  ],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -29,17 +35,8 @@ export default defineConfig({
     proxy,
   },
   build: {
+    // Source maps for prod debugging; Rolldown (Vite 8) handles vendor chunking automatically.
     sourcemap: true,
-    // Split heavy vendor chunks so the initial route stays light.
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          charts: ["recharts"],
-          query: ["@tanstack/react-query", "@tanstack/react-table"],
-        },
-      },
-    },
   },
   test: {
     globals: true,

@@ -8,21 +8,25 @@ import { Button } from "@/components/ui/button";
 export function CallbackPage() {
   const navigate = useNavigate();
   const { setSession } = useAuth();
-  const [error, setError] = useState<string | null>(null);
-  const ran = useRef(false); // guard React 18/19 StrictMode double-invoke
+
+  // Parse the callback once, during render, so the synchronous validation result is the initial
+  // state — no synchronous setState inside the effect.
+  const [params] = useState(() => new URLSearchParams(window.location.search));
+  const code = params.get("code");
+  const state = params.get("state");
+  const [error, setError] = useState<string | null>(() => {
+    if (params.get("error")) return params.get("error");
+    if (!params.get("code") || !params.get("state")) return "Missing authorization code.";
+    return null;
+  });
+  const ran = useRef(false); // guard React 19 StrictMode double-invoke
 
   useEffect(() => {
+    if (error || !code || !state) return;
     if (ran.current) return;
     ran.current = true;
 
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    const state = params.get("state");
-    const oauthError = params.get("error");
-
-    if (oauthError) return setError(oauthError);
-    if (!code || !state) return setError("Missing authorization code.");
-
+    // setError here runs inside an async callback, not synchronously in the effect body.
     completeLogin(code, state)
       .then((tokens) => {
         setSession(tokens);
@@ -31,7 +35,7 @@ export function CallbackPage() {
       .catch((e: unknown) =>
         setError(e instanceof Error ? e.message : "Sign-in failed."),
       );
-  }, [navigate, setSession]);
+  }, [code, state, error, navigate, setSession]);
 
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
