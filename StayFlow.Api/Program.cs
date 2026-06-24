@@ -25,7 +25,7 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 
 builder.Services.AddApplication();
 builder.Services.AddPersistence(connectionString);
-builder.Services.AddInfrastructure(builder.Environment.IsDevelopment());
+builder.Services.AddInfrastructure(builder.Environment.IsDevelopment(), builder.Configuration);
 builder.Services.AddCaching(builder.Configuration.GetConnectionString("Redis"));
 builder.Services.AddAudit(builder.Configuration.GetConnectionString("Mongo"));
 builder.Services.AddObservability(builder.Configuration);

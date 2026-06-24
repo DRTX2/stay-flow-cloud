@@ -11,6 +11,9 @@
 
     <ItemGroup>
         <PackageReference Include="OpenIddict.AspNetCore" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" />
+        <PackageReference Include="AspNet.Security.OAuth.GitHub" />
         <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
         <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" />
         <PackageReference Include="StackExchange.Redis" />

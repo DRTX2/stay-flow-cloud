@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenIddict.Abstractions;
 using OpenIddict.Validation.AspNetCore;
@@ -16,7 +18,10 @@ namespace StayFlow.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, bool isDevelopment = false)
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        bool isDevelopment = false,
+        IConfiguration? configuration = null)
     {
         services.AddHttpContextAccessor();
 
@@ -40,10 +45,11 @@ public static class DependencyInjection
             })
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<StayFlowDbContext>()
+            .AddSignInManager()
             .AddDefaultTokenProviders();
 
         AddOpenIddict(services, isDevelopment);
-        AddPermissionAuthorization(services);
+        AddAuthenticationAndAuthorization(services, configuration);
 
         return services;
     }
@@ -58,15 +64,23 @@ public static class DependencyInjection
             })
             .AddServer(options =>
             {
-                options.SetTokenEndpointUris("connect/token");
+                options.SetTokenEndpointUris("connect/token")
+                    .SetAuthorizationEndpointUris("connect/authorize")
+                    .SetEndSessionEndpointUris("connect/logout")
+                    .SetUserInfoEndpointUris("connect/userinfo");
 
                 options.AllowPasswordFlow()
                     .AllowClientCredentialsFlow()
                     .AllowRefreshTokenFlow();
 
+                // Authorization Code + PKCE for the browser SPA and external API integrators.
+                options.AllowAuthorizationCodeFlow()
+                    .RequireProofKeyForCodeExchange();
+
                 options.RegisterScopes(
                     AuthConstants.ApiScope,
                     OpenIddictConstants.Scopes.OpenId,
+                    OpenIddictConstants.Scopes.Email,
                     OpenIddictConstants.Scopes.Profile,
                     OpenIddictConstants.Scopes.Roles,
                     OpenIddictConstants.Scopes.OfflineAccess);
@@ -81,7 +95,10 @@ public static class DependencyInjection
                 options.DisableAccessTokenEncryption();
 
                 var aspNetCore = options.UseAspNetCore()
-                    .EnableTokenEndpointPassthrough();
+                    .EnableTokenEndpointPassthrough()
+                    .EnableAuthorizationEndpointPassthrough()
+                    .EnableEndSessionEndpointPassthrough()
+                    .EnableUserInfoEndpointPassthrough();
 
                 // Local development is served over plain HTTP; allow the token endpoint to accept it.
                 // Production terminates TLS (at the edge or Kestrel) so this stays on by default there.
@@ -97,12 +114,36 @@ public static class DependencyInjection
             });
     }
 
-    private static void AddPermissionAuthorization(IServiceCollection services)
+    private static void AddAuthenticationAndAuthorization(IServiceCollection services, IConfiguration? configuration)
     {
-        services.AddAuthentication(options =>
+        // API calls authenticate with bearer tokens (OpenIddict validation) by default; the
+        // interactive Authorization Code flow uses Identity's application cookie for the logged-in
+        // user, and external providers sign in through the external cookie.
+        var authentication = services.AddAuthentication(options =>
         {
             options.DefaultScheme = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
         });
+
+        authentication.AddCookie(IdentityConstants.ApplicationScheme, options =>
+        {
+            options.LoginPath = "/account/login";
+            options.LogoutPath = "/account/logout";
+            options.Cookie.Name = "StayFlow.Identity";
+            options.Cookie.HttpOnly = true;
+            options.ExpireTimeSpan = TimeSpan.FromHours(1);
+        });
+
+        authentication.AddCookie(IdentityConstants.ExternalScheme, options =>
+        {
+            options.Cookie.Name = "StayFlow.External";
+            options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
+        });
+
+        // Registered so SignInManager (which signs these out) has handlers for every Identity scheme.
+        authentication.AddCookie(IdentityConstants.TwoFactorRememberMeScheme);
+        authentication.AddCookie(IdentityConstants.TwoFactorUserIdScheme);
+
+        AddSocialLogin(authentication, configuration);
 
         var authorization = services.AddAuthorizationBuilder();
 
@@ -111,6 +152,53 @@ public static class DependencyInjection
         {
             authorization.AddPolicy(permission, policy =>
                 policy.RequireClaim(AuthConstants.PermissionClaim, permission));
+        }
+    }
+
+    /// <summary>
+    /// Registers external identity providers, each only when its credentials are configured (under
+    /// Authentication:Google|Microsoft|GitHub), so the app builds and runs without any social setup.
+    /// All providers sign in through the external cookie, which the account callback then links to a
+    /// local user.
+    /// </summary>
+    private static void AddSocialLogin(AuthenticationBuilder authentication, IConfiguration? configuration)
+    {
+        if (configuration is null)
+        {
+            return;
+        }
+
+        var google = configuration.GetSection("Authentication:Google");
+        if (google["ClientId"] is { Length: > 0 } googleId && google["ClientSecret"] is { Length: > 0 } googleSecret)
+        {
+            authentication.AddGoogle(options =>
+            {
+                options.ClientId = googleId;
+                options.ClientSecret = googleSecret;
+                options.SignInScheme = IdentityConstants.ExternalScheme;
+            });
+        }
+
+        var microsoft = configuration.GetSection("Authentication:Microsoft");
+        if (microsoft["ClientId"] is { Length: > 0 } microsoftId && microsoft["ClientSecret"] is { Length: > 0 } microsoftSecret)
+        {
+            authentication.AddMicrosoftAccount(options =>
+            {
+                options.ClientId = microsoftId;
+                options.ClientSecret = microsoftSecret;
+                options.SignInScheme = IdentityConstants.ExternalScheme;
+            });
+        }
+
+        var github = configuration.GetSection("Authentication:GitHub");
+        if (github["ClientId"] is { Length: > 0 } githubId && github["ClientSecret"] is { Length: > 0 } githubSecret)
+        {
+            authentication.AddGitHub(options =>
+            {
+                options.ClientId = githubId;
+                options.ClientSecret = githubSecret;
+                options.SignInScheme = IdentityConstants.ExternalScheme;
+            });
         }
     }
 }

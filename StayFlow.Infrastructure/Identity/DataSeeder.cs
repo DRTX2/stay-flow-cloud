@@ -69,14 +69,28 @@ public sealed class DataSeeder(IServiceProvider serviceProvider, ILogger<DataSee
                 ClientId = AuthConstants.Clients.Spa,
                 ClientType = OpenIddictConstants.ClientTypes.Public,
                 DisplayName = "StayFlow SPA (first-party)",
+                // Browser callbacks for the Authorization Code + PKCE flow (Vite dev server).
+                RedirectUris = { new Uri("http://localhost:5173/callback") },
+                PostLogoutRedirectUris = { new Uri("http://localhost:5173/") },
                 Permissions =
                 {
                     OpenIddictConstants.Permissions.Endpoints.Token,
+                    OpenIddictConstants.Permissions.Endpoints.Authorization,
+                    OpenIddictConstants.Permissions.Endpoints.EndSession,
+                    // Authorization Code + PKCE for the browser app; password kept for first-party
+                    // scripting/tests; refresh for silent renewal.
+                    OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
                     OpenIddictConstants.Permissions.GrantTypes.Password,
                     OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                    OpenIddictConstants.Permissions.ResponseTypes.Code,
                     OpenIddictConstants.Permissions.Prefixes.Scope + AuthConstants.ApiScope,
+                    OpenIddictConstants.Permissions.Scopes.Email,
                     OpenIddictConstants.Permissions.Scopes.Profile,
                     OpenIddictConstants.Permissions.Scopes.Roles,
+                },
+                Requirements =
+                {
+                    OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange,
                 },
             }, cancellationToken);
         }

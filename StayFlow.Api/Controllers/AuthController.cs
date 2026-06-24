@@ -15,9 +15,10 @@ using StayFlow.Persistence.Identity;
 namespace StayFlow.Api.Controllers;
 
 /// <summary>
-/// OAuth2 token endpoint and identity introspection. Supports the password (first-party SPA) and
-/// client-credentials (machine-to-machine) grants, plus refresh-token rotation. Authorization Code
-/// + PKCE is the intended future addition once a login/consent UI exists.
+/// OAuth2 token endpoint and identity introspection. Handles the token-issuing grants — password
+/// (first-party SPA), client-credentials (machine-to-machine), refresh-token rotation, and the
+/// Authorization Code exchange (PKCE). The interactive authorize/login lives in
+/// <see cref="AuthorizeController"/> and <see cref="AccountController"/>.
 /// </summary>
 [ApiController]
 public sealed class AuthController(
@@ -41,9 +42,9 @@ public sealed class AuthController(
             return HandleClientCredentialsGrant(request);
         }
 
-        if (request.IsRefreshTokenGrantType())
+        if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType())
         {
-            return await HandleRefreshTokenGrantAsync();
+            return await HandleStoredPrincipalGrantAsync();
         }
 
         return Forbidden(OpenIddictConstants.Errors.UnsupportedGrantType, "The specified grant type is not supported.");
@@ -96,13 +97,19 @@ public sealed class AuthController(
         return SignInWith(identity, request.GetScopes());
     }
 
-    private async Task<IActionResult> HandleRefreshTokenGrantAsync()
+    // Shared by the authorization-code exchange and refresh-token rotation: OpenIddict restores the
+    // principal (and its claim destinations) stashed when the code/refresh token was issued. We only
+    // re-validate that the account is still active before re-issuing tokens; destinations are kept.
+    private async Task<IActionResult> HandleStoredPrincipalGrantAsync()
     {
         var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         var principal = result.Principal;
-        var userId = principal?.GetClaim(OpenIddictConstants.Claims.Subject);
+        if (principal is null)
+        {
+            return Forbidden(OpenIddictConstants.Errors.InvalidGrant, "The token is no longer valid.");
+        }
 
-        // Re-validate the user is still active before re-issuing tokens.
+        var userId = principal.GetClaim(OpenIddictConstants.Claims.Subject);
         if (userId is not null)
         {
             var user = await userManager.FindByIdAsync(userId);
@@ -110,11 +117,6 @@ public sealed class AuthController(
             {
                 return Forbidden(OpenIddictConstants.Errors.InvalidGrant, "The account is no longer active.");
             }
-        }
-
-        foreach (var claim in principal!.Claims)
-        {
-            claim.SetDestinations(OpenIddictConstants.Destinations.AccessToken);
         }
 
         return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
