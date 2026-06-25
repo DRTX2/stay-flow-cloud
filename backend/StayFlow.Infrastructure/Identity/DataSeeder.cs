@@ -69,9 +69,19 @@ public sealed class DataSeeder(IServiceProvider serviceProvider, ILogger<DataSee
                 ClientId = AuthConstants.Clients.Spa,
                 ClientType = OpenIddictConstants.ClientTypes.Public,
                 DisplayName = "StayFlow SPA (first-party)",
-                // Browser callbacks for the Authorization Code + PKCE flow (Vite dev server).
-                RedirectUris = { new Uri("http://localhost:5173/callback") },
-                PostLogoutRedirectUris = { new Uri("http://localhost:5173/") },
+                // Authorization Code + PKCE callbacks. The Next.js BFF completes the flow
+                // server-side at /api/auth/callback (tokens land in httpOnly cookies); the
+                // 5173 entries remain for the legacy Vite SPA / local tooling.
+                RedirectUris =
+                {
+                    new Uri("http://localhost:3000/api/auth/callback"),
+                    new Uri("http://localhost:5173/callback"),
+                },
+                PostLogoutRedirectUris =
+                {
+                    new Uri("http://localhost:3000/"),
+                    new Uri("http://localhost:5173/"),
+                },
                 Permissions =
                 {
                     OpenIddictConstants.Permissions.Endpoints.Token,
