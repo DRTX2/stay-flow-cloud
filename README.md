@@ -31,10 +31,10 @@ microservices.
 
 ```
 backend/     ASP.NET Core solution (StayFlowCloud.sln) — see Architecture below
-frontend/    React 19 + TypeScript SPA (Vite, Tailwind, shadcn/ui, TanStack, Redux Toolkit) — see frontend/README.md
+frontend/    Next.js 16 + React 19 (App Router, RSC, BFF auth, Tailwind, shadcn/ui) — see frontend/README.md
 deploy/       Terraform (AWS), Prometheus/Grafana provisioning
 docs/         Architecture notes and the improvement analysis
-compose.yaml  Full local stack (API + Postgres + Redis + Mongo + Prometheus + Grafana)
+compose.yaml  Full local stack (web + API + Postgres + Redis + Mongo + RabbitMQ + Prometheus + Grafana)
 ```
 
 Each `backend/` and `frontend/` is independently buildable; the split is the first step toward
@@ -122,11 +122,12 @@ OpenIddict exposes a standards-compliant OAuth2/OIDC server:
 | Resource Owner Password | `POST /connect/token` (`grant_type=password`) | First-party login |
 | Client Credentials | `POST /connect/token` (`grant_type=client_credentials`) | Machine-to-machine / public API |
 | Refresh Token | `POST /connect/token` (`grant_type=refresh_token`) | Token rotation |
-| Authorization Code + PKCE | `GET /connect/authorize` → `POST /connect/token` | SPA / mobile (see seeded `spa` client) |
+| Authorization Code + PKCE | `GET /connect/authorize` → `POST /connect/token` | Next.js BFF / mobile (see seeded `spa` client) |
 | Social login | `/account/external` (Google / Microsoft / GitHub) | Federated sign-in (enabled when configured) |
 
 Supporting endpoints: `/connect/userinfo` (scope-gated claims), `/connect/logout`, `/account/login`.
-The seeded SPA client redirects to `http://localhost:5173/callback` and requires PKCE.
+The seeded SPA client redirects to `http://localhost:3000/api/auth/callback` (the Next.js BFF, which
+completes the PKCE exchange server-side and stores tokens in httpOnly cookies) and requires PKCE.
 
 ---
 
@@ -187,11 +188,13 @@ clients) on first run.
 ```bash
 cd frontend
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:3000
 ```
 
-The SPA proxies API/auth calls to the backend on `:8080` (same-origin, no CORS). Sign in with the
-seeded `admin@stayflow.local` / `Admin123$`. See [`frontend/README.md`](frontend/README.md).
+The Next.js app proxies API/auth calls to the backend on `:8080` and completes OAuth server-side
+(BFF; tokens in httpOnly cookies). The public marketing/booking site is at `/`, the dashboard at
+`/dashboard`. Sign in with the seeded `admin@stayflow.local` / `Admin123$`. See
+[`frontend/README.md`](frontend/README.md).
 
 ---
 
@@ -265,7 +268,8 @@ See the [Terraform README](deploy/terraform/README.md) for backend, TLS and sizi
 
 ## Roadmap
 
-Backend, an enterprise React 19 frontend, infrastructure and tooling are in place. Planned next steps
-are tracked in [`PENDING.md`](PENDING.md) and the [improvement analysis](docs/IMPROVEMENTS.md) —
-highlights: event-driven microservice extraction (the agreed next step), running the Playwright E2E
-suite in CI, semantic search (embeddings/RAG), and cloud networking hardening.
+Backend, a Next.js 16 frontend (public site + dashboard, BFF auth), a first extracted microservice
+(notifications over RabbitMQ), infrastructure and tooling are in place. Planned next steps are tracked
+in [`PENDING.md`](PENDING.md) and the [improvement analysis](docs/IMPROVEMENTS.md) — highlights:
+further microservice extraction, running the Playwright E2E suite in CI, semantic search
+(embeddings/RAG), and cloud networking hardening.

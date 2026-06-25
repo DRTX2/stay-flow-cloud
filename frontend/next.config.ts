@@ -4,6 +4,8 @@ const apiTarget = process.env.API_PROXY_TARGET ?? "http://localhost:8080";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Self-contained server bundle for the Docker runtime image.
+  output: "standalone",
   // React Compiler (stable in React 19) auto-memoizes components — no manual memo/useMemo.
   reactCompiler: true,
   // Source maps in prod for readable stack traces (this is a portfolio app, not a secret).

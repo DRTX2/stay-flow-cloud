@@ -1,5 +1,0 @@
-#!/usr/bin/env sh
-# Enforce Conventional Commits.
-root="$(git rev-parse --show-toplevel)"
-cd "$root/frontend" || exit 0
-npx --no-install commitlint --edit "$root/$1"

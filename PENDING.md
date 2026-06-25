@@ -4,14 +4,15 @@ Snapshot of what remains after the backend/infra/tooling are complete.
 
 ## Not yet built
 
-- **Microservice extraction** — pull a bounded context (Notifications or Analytics) out of the
-  monolith as a standalone service over the existing outbox/integration events. This is the agreed
-  next step (`docs/IMPROVEMENTS.md §1`).
-- **Run Playwright E2E against a live stack** — specs exist (`frontend/e2e`: login, dashboard,
-  reservation lifecycle); wire them into CI with the backend + dev server running.
-- **Frontend depth** — the enterprise SPA covers auth, the executive dashboard and full CRUD-style
-  tables for every entity (create/cancel/invoice on reservations). Still to add: edit forms for the
-  other entities, the guest-facing customer portal, and server-side pagination for large datasets.
+- **Further microservice extraction** — the Notification service is extracted (RabbitMQ consumer over
+  the outbox/integration events); next pull Analytics or Billing out of the monolith
+  (`docs/IMPROVEMENTS.md §1`).
+- **Run Playwright E2E against a live stack** — specs exist (`frontend/e2e`: auth, dashboard,
+  reservation lifecycle, public booking); wire them into CI with the backend + web server running.
+- **Frontend depth** — the Next.js app covers the public marketing/booking site (SSG/ISR/SEO), BFF
+  auth, the executive dashboard and entity modules, with server actions for reservations
+  (create/cancel/invoice) and tenant-feature toggles. Still to add: edit forms for the remaining
+  entities and server-side pagination for large datasets.
 
 ## Nice-to-have hardening
 
