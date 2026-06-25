@@ -29,7 +29,7 @@ builder.Services.AddInfrastructure(builder.Environment.IsDevelopment(), builder.
 builder.Services.AddCaching(builder.Configuration.GetConnectionString("Redis"));
 builder.Services.AddAudit(builder.Configuration.GetConnectionString("Mongo"));
 builder.Services.AddObservability(builder.Configuration);
-builder.Services.AddMessaging();
+builder.Services.AddMessaging(builder.Configuration);
 builder.Services.AddBackgroundJobs(connectionString);
 builder.Services.AddDocumentStorage(builder.Configuration);
 

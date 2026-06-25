@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared integration-event contracts exchanged over the message bus. Referenced by both the
+    monolith (publisher) and the extracted microservices (consumers) so the message type — and
+    therefore the MassTransit message URN — is identical on both sides.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -14,6 +14,7 @@ COPY StayFlow.Application/StayFlow.Application.csproj StayFlow.Application/
 COPY StayFlow.Domain/StayFlow.Domain.csproj StayFlow.Domain/
 COPY StayFlow.Infrastructure/StayFlow.Infrastructure.csproj StayFlow.Infrastructure/
 COPY StayFlow.Persistence/StayFlow.Persistence.csproj StayFlow.Persistence/
+COPY StayFlow.Contracts/StayFlow.Contracts.csproj StayFlow.Contracts/
 COPY StayFlow.UnitTests/StayFlow.UnitTests.csproj StayFlow.UnitTests/
 COPY StayFlow.IntegrationTests/StayFlow.IntegrationTests.csproj StayFlow.IntegrationTests/
 RUN dotnet restore StayFlow.Api/StayFlow.Api.csproj

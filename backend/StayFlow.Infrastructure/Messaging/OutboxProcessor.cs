@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StayFlow.Application.Common.Abstractions;
+using StayFlow.Contracts;
 using StayFlow.Persistence;
 
 namespace StayFlow.Infrastructure.Messaging;
