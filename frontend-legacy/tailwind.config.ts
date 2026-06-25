@@ -1,11 +1,11 @@
 import type { Config } from "tailwindcss";
 import animate from "tailwindcss-animate";
 
-// shadcn/ui design tokens mapped to CSS variables (see src/app/globals.css), so the whole
+// shadcn/ui design tokens mapped to CSS variables (see src/styles/globals.css), so the whole
 // design system is themeable (light/dark) from one place.
 const config: Config = {
   darkMode: ["class"],
-  content: ["./src/**/*.{ts,tsx,mdx}"],
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     container: {
       center: true,
