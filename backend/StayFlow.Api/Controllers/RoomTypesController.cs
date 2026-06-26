@@ -22,4 +22,12 @@ public sealed class RoomTypesController : ApiControllerBase
         var id = await Sender.Send(command);
         return CreatedAtAction(nameof(List), new { id }, new { id });
     }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = Permissions.RoomsManage)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateRoomTypeCommand command)
+    {
+        await Sender.Send(command with { Id = id });
+        return NoContent();
+    }
 }

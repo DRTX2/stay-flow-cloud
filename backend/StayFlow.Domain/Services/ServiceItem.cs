@@ -59,4 +59,22 @@ public sealed class ServiceItem : TenantEntity
     public void Activate() => IsActive = true;
 
     public void Deactivate() => IsActive = false;
+
+    public void Update(string name, decimal price, ServiceCategory category, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new DomainException("Service name is required.");
+        }
+
+        if (price < 0)
+        {
+            throw new DomainException("Service price cannot be negative.");
+        }
+
+        Name = name.Trim();
+        Price = price;
+        Category = category;
+        Description = description?.Trim();
+    }
 }

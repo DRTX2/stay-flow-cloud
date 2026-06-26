@@ -29,4 +29,12 @@ public sealed class GuestsController : ApiControllerBase
         var id = await Sender.Send(command);
         return CreatedAtAction(nameof(GetById), new { id }, new { id });
     }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = Permissions.GuestsManage)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateGuestCommand command)
+    {
+        await Sender.Send(command with { Id = id });
+        return NoContent();
+    }
 }

@@ -60,4 +60,28 @@ public sealed class Guest : TenantEntity
         Email = email.Trim().ToLowerInvariant();
         Phone = phone?.Trim();
     }
+
+    public void UpdateProfile(string firstName, string lastName, string email, string? phone, string? documentNumber)
+    {
+        if (string.IsNullOrWhiteSpace(firstName))
+        {
+            throw new DomainException("Guest first name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(lastName))
+        {
+            throw new DomainException("Guest last name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@', StringComparison.Ordinal))
+        {
+            throw new DomainException("A valid guest email is required.");
+        }
+
+        FirstName = firstName.Trim();
+        LastName = lastName.Trim();
+        Email = email.Trim().ToLowerInvariant();
+        Phone = phone?.Trim();
+        DocumentNumber = documentNumber?.Trim();
+    }
 }

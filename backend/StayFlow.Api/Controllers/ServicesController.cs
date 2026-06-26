@@ -22,4 +22,12 @@ public sealed class ServicesController : ApiControllerBase
         var id = await Sender.Send(command);
         return CreatedAtAction(nameof(List), new { id }, new { id });
     }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = Permissions.ServicesManage)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateServiceItemCommand command)
+    {
+        await Sender.Send(command with { Id = id });
+        return NoContent();
+    }
 }
