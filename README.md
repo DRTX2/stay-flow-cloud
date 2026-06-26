@@ -137,10 +137,12 @@ Representative resource endpoints (all tenant-scoped, permission-gated):
 
 ```
 GET    /api/v1/reservations         POST /api/v1/reservations
-GET    /api/v1/rooms                GET  /api/v1/roomtypes
-GET    /api/v1/guests               POST /api/v1/guests
-GET    /api/v1/invoices
-GET    /api/v1/services
+POST   /api/v1/reservations/{id}/{confirm|check-in|check-out|cancel}
+GET    /api/v1/rooms                POST /api/v1/rooms     PUT /api/v1/rooms/{id}/price
+GET    /api/v1/roomtypes            POST /api/v1/roomtypes PUT /api/v1/roomtypes/{id}
+GET    /api/v1/guests               POST /api/v1/guests    PUT /api/v1/guests/{id}
+GET    /api/v1/services             POST /api/v1/services  PUT /api/v1/services/{id}
+GET    /api/v1/invoices             POST /api/v1/invoices  POST /api/v1/invoices/{id}/pay
 GET    /api/v1/analytics/dashboard  GET  /api/v1/analytics/revenue
 GET    /api/v1/audit
 GET    /api/v1/tenantfeatures
@@ -243,9 +245,11 @@ dotnet test
 
 `.github/workflows/ci.yml`:
 
-1. **build-test** — restore, build (warnings as errors), run tests.
-2. **sonar** — SonarCloud static analysis (runs when `SONAR_TOKEN` is present).
-3. **docker** — build and push the API image to GHCR on `main`.
+1. **build-test** — restore, build (warnings as errors), run the .NET test suites.
+2. **frontend** — install, lint, typecheck, unit-test and build the Next.js app.
+3. **e2e** — bring the API up via Docker Compose and run the Playwright suite against it.
+4. **sonar** — SonarCloud static analysis (runs when `SONAR_TOKEN` is present).
+5. **docker** — build and push the API image to GHCR on `main`.
 
 ---
 

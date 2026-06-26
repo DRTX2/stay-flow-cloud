@@ -7,16 +7,14 @@ Snapshot of what remains after the backend/infra/tooling are complete.
 - **Further microservice extraction** — the Notification service is extracted (RabbitMQ consumer over
   the outbox/integration events); next pull Analytics or Billing out of the monolith
   (`docs/IMPROVEMENTS.md §1`).
-- **Run Playwright E2E against a live stack** — specs exist (`frontend/e2e`: auth, dashboard,
-  reservation lifecycle, public booking); wire them into CI with the backend + web server running.
-- **Frontend depth** — the Next.js app covers the public marketing/booking site (SSG/ISR/SEO), BFF
-  auth, the executive dashboard and entity modules. Server actions now drive create dialogs for
-  rooms, room types, guests and services; the full reservation lifecycle (confirm / check-in /
-  check-out / cancel / generate invoice); room base-price updates; invoice "mark as paid"; and
-  tenant-feature toggles. Still to add: **edit (update) forms** for guests/services/room-types
-  (needs matching backend `PUT`/`PATCH` endpoints first — only room price and reservation/invoice
-  transitions are mutable today) and **server-side pagination** for large datasets (the list
-  endpoints already accept `page`/`pageSize`; the tables currently paginate client-side).
+
+The dashboard is now full CRUD: create **and edit** dialogs for rooms, room types, guests and
+services (backend `PUT /api/v1/{guests,services,roomtypes}/{id}`), the full reservation lifecycle
+(confirm / check-in / check-out / cancel / generate invoice), room base-price updates, invoice
+"mark as paid", and tenant-feature toggles. Reservations, guests, rooms and invoices use
+**server-side pagination** (deep-linkable `?page/?pageSize/?search`). The Playwright E2E suite runs
+in CI against a live Compose-backed API (`e2e` job). Remaining frontend depth is optional polish
+(bulk actions, richer filtering, a customer self-service portal).
 
 ## Nice-to-have hardening
 
