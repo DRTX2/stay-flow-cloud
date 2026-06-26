@@ -33,15 +33,13 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "StayFlow Cloud",
     title: "StayFlow Cloud — Hospitality Management Platform",
-    description:
-      "Reservations, front desk, billing and analytics for modern hotels.",
+    description: "Reservations, front desk, billing and analytics for modern hotels.",
     url: siteUrl,
   },
   twitter: {
     card: "summary_large_image",
     title: "StayFlow Cloud",
-    description:
-      "Reservations, front desk, billing and analytics for modern hotels.",
+    description: "Reservations, front desk, billing and analytics for modern hotels.",
   },
   robots: { index: true, follow: true },
 };

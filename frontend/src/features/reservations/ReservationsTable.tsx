@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { CalendarX } from "lucide-react";
 import { toast } from "sonner";
 import type { Reservation } from "@/types/api";
+import type { ActionResult } from "@/server/actions";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataTable } from "@/components/shared/data-table/DataTable";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,9 @@ import {
 } from "@/components/ui/dialog";
 import {
   cancelReservationAction,
+  checkInReservationAction,
+  checkOutReservationAction,
+  confirmReservationAction,
   generateInvoiceAction,
 } from "@/app/dashboard/reservations/actions";
 import { reservationColumns } from "./columns";
@@ -25,11 +29,11 @@ export function ReservationsTable({ data }: { data: Reservation[] }) {
   const [toCancel, setToCancel] = useState<Reservation | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function handleInvoice(r: Reservation) {
+  function run(action: () => Promise<ActionResult>, success: string, failure: string) {
     startTransition(async () => {
-      const result = await generateInvoiceAction(r.id);
-      if (result.ok) toast.success("Invoice generated");
-      else toast.error(result.error ?? "Could not generate invoice");
+      const result = await action();
+      if (result.ok) toast.success(success);
+      else toast.error(result.error ?? failure);
     });
   }
 
@@ -37,16 +41,35 @@ export function ReservationsTable({ data }: { data: Reservation[] }) {
     const target = toCancel;
     setToCancel(null);
     if (!target) return;
-    startTransition(async () => {
-      const result = await cancelReservationAction(target.id);
-      if (result.ok) toast.success("Reservation cancelled");
-      else toast.error(result.error ?? "Could not cancel reservation");
-    });
+    run(
+      () => cancelReservationAction(target.id),
+      "Reservation cancelled",
+      "Could not cancel reservation",
+    );
   }
 
   const columns = reservationColumns({
+    onConfirm: (r) =>
+      run(
+        () => confirmReservationAction(r.id),
+        "Reservation confirmed",
+        "Could not confirm reservation",
+      ),
+    onCheckIn: (r) =>
+      run(() => checkInReservationAction(r.id), "Guest checked in", "Could not check in"),
+    onCheckOut: (r) =>
+      run(
+        () => checkOutReservationAction(r.id),
+        "Guest checked out",
+        "Could not check out",
+      ),
+    onInvoice: (r) =>
+      run(
+        () => generateInvoiceAction(r.id),
+        "Invoice generated",
+        "Could not generate invoice",
+      ),
     onCancel: setToCancel,
-    onInvoice: handleInvoice,
     pending,
   });
 

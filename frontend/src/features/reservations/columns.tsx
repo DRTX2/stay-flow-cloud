@@ -1,7 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Ban, FileText } from "lucide-react";
+import { MoreHorizontal, Ban, FileText, Check, LogIn, LogOut } from "lucide-react";
 import type { Reservation } from "@/types/api";
 import { formatDate, money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,18 @@ import { DataTableColumnHeader } from "@/components/shared/data-table/DataTableC
 import { StatusBadge } from "@/components/shared/StatusBadge";
 
 interface Actions {
+  onConfirm: (r: Reservation) => void;
+  onCheckIn: (r: Reservation) => void;
+  onCheckOut: (r: Reservation) => void;
   onCancel: (r: Reservation) => void;
   onInvoice: (r: Reservation) => void;
   pending?: boolean;
 }
 
 export function reservationColumns({
+  onConfirm,
+  onCheckIn,
+  onCheckOut,
   onCancel,
   onInvoice,
   pending,
@@ -59,7 +65,9 @@ export function reservationColumns({
       accessorKey: "total",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Total" />,
       cell: ({ row }) => (
-        <span className="tabular-nums">{money(row.original.total)}</span>
+        <span className="tabular-nums">
+          {money(row.original.total ?? row.original.totalPrice)}
+        </span>
       ),
     },
     {
@@ -68,7 +76,10 @@ export function reservationColumns({
       cell: ({ row }) => {
         const r = row.original;
         const status = (r.status ?? "").toLowerCase();
-        const cancellable = status !== "cancelled" && status !== "checkedout";
+        const isPending = status === "pending";
+        const isConfirmed = status === "confirmed";
+        const isCheckedIn = status === "checkedin";
+        const terminal = status === "cancelled" || status === "checkedout";
         return (
           <div className="text-right">
             <DropdownMenu>
@@ -85,12 +96,27 @@ export function reservationColumns({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                {isPending && (
+                  <DropdownMenuItem onClick={() => onConfirm(r)}>
+                    <Check className="h-4 w-4" /> Confirm
+                  </DropdownMenuItem>
+                )}
+                {isConfirmed && (
+                  <DropdownMenuItem onClick={() => onCheckIn(r)}>
+                    <LogIn className="h-4 w-4" /> Check in
+                  </DropdownMenuItem>
+                )}
+                {isCheckedIn && (
+                  <DropdownMenuItem onClick={() => onCheckOut(r)}>
+                    <LogOut className="h-4 w-4" /> Check out
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => onInvoice(r)}>
                   <FileText className="h-4 w-4" /> Generate invoice
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  disabled={!cancellable}
+                  disabled={terminal}
                   className="text-destructive focus:text-destructive"
                   onClick={() => onCancel(r)}
                 >

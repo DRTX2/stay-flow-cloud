@@ -37,6 +37,7 @@ export type ReservationStatus =
 export interface Reservation {
   id: string;
   guestId?: string;
+  // Resolved on the server from the guest/room lists (the API list returns only ids).
   guestName?: string;
   roomId?: string;
   roomNumber?: string;
@@ -44,7 +45,10 @@ export interface Reservation {
   checkIn?: string;
   checkOut?: string;
   numberOfGuests?: number;
+  totalPrice?: number;
   total?: number;
+  confirmationCode?: string;
+  nights?: number;
 }
 
 export interface CreateReservationRequest {
@@ -60,8 +64,18 @@ export interface Room {
   number?: string;
   roomTypeId?: string;
   roomTypeName?: string;
+  basePrice?: number;
+  capacity?: number;
   status?: string;
   floor?: number;
+}
+
+export interface CreateRoomRequest {
+  number: string;
+  roomTypeId: string;
+  basePrice: number;
+  capacity: number;
+  floor: number;
 }
 
 export interface RoomType {
@@ -72,6 +86,13 @@ export interface RoomType {
   description?: string;
 }
 
+export interface CreateRoomTypeRequest {
+  name: string;
+  baseRate: number;
+  maxOccupancy: number;
+  description?: string;
+}
+
 export interface Guest {
   id: string;
   fullName?: string;
@@ -79,7 +100,15 @@ export interface Guest {
   lastName?: string;
   email?: string;
   phone?: string;
-  documentId?: string;
+  documentNumber?: string;
+}
+
+export interface CreateGuestRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  documentNumber?: string;
 }
 
 export interface Invoice {
@@ -87,15 +116,40 @@ export interface Invoice {
   number?: string;
   reservationId?: string;
   status?: string;
-  issuedOn?: string;
+  currency?: string;
+  issuedAtUtc?: string;
+  dueAtUtc?: string;
+  paidAtUtc?: string;
+  subtotal?: number;
+  taxTotal?: number;
   total?: number;
-  tax?: number;
 }
+
+// Matches the backend ServiceCategory enum (now serialized as its string name).
+export const SERVICE_CATEGORIES = [
+  "FoodAndBeverage",
+  "Spa",
+  "Transport",
+  "Laundry",
+  "Excursion",
+  "Other",
+] as const;
+
+export type ServiceCategory = (typeof SERVICE_CATEGORIES)[number];
 
 export interface ServiceItem {
   id: string;
   name?: string;
   price?: number;
+  category?: ServiceCategory | string;
+  isActive?: boolean;
+  description?: string;
+}
+
+export interface CreateServiceRequest {
+  name: string;
+  price: number;
+  category: ServiceCategory;
   description?: string;
 }
 

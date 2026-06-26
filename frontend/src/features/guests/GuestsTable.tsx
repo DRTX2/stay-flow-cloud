@@ -42,9 +42,9 @@ const columns: ColumnDef<Guest>[] = [
     cell: ({ row }) => row.original.phone ?? "—",
   },
   {
-    accessorKey: "documentId",
+    accessorKey: "documentNumber",
     header: "Document",
-    cell: ({ row }) => row.original.documentId ?? "—",
+    cell: ({ row }) => row.original.documentNumber ?? "—",
   },
 ];
 

@@ -2,11 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { apiFetch } from "@/server/api";
+import { fail, ok, type ActionResult } from "@/server/actions";
 import type { CreateReservationRequest } from "@/types/api";
 
-export interface ActionResult {
-  ok: boolean;
-  error?: string;
+export type { ActionResult };
+
+function revalidateReservations() {
+  revalidatePath("/dashboard/reservations");
+  revalidatePath("/dashboard");
 }
 
 export async function createReservationAction(
@@ -17,30 +20,50 @@ export async function createReservationAction(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!res.ok)
-    return { ok: false, error: `Could not create reservation (${res.status}).` };
-  revalidatePath("/dashboard/reservations");
-  revalidatePath("/dashboard");
-  return { ok: true };
+  if (!res.ok) return fail(res, "Could not create reservation");
+  revalidateReservations();
+  return ok;
+}
+
+/** POST a reservation lifecycle transition (confirm/cancel/check-in/check-out). */
+async function transition(
+  id: string,
+  action: string,
+  fallback: string,
+): Promise<ActionResult> {
+  const res = await apiFetch(`/api/v1/reservations/${id}/${action}`, { method: "POST" });
+  if (!res.ok) return fail(res, fallback);
+  revalidateReservations();
+  return ok;
+}
+
+export async function confirmReservationAction(id: string): Promise<ActionResult> {
+  return transition(id, "confirm", "Could not confirm reservation");
+}
+
+export async function checkInReservationAction(id: string): Promise<ActionResult> {
+  return transition(id, "check-in", "Could not check in reservation");
+}
+
+export async function checkOutReservationAction(id: string): Promise<ActionResult> {
+  return transition(id, "check-out", "Could not check out reservation");
 }
 
 export async function cancelReservationAction(id: string): Promise<ActionResult> {
-  const res = await apiFetch(`/api/v1/reservations/${id}/cancel`, { method: "POST" });
-  if (!res.ok)
-    return { ok: false, error: `Could not cancel reservation (${res.status}).` };
-  revalidatePath("/dashboard/reservations");
-  revalidatePath("/dashboard");
-  return { ok: true };
+  return transition(id, "cancel", "Could not cancel reservation");
 }
 
 export async function generateInvoiceAction(
   reservationId: string,
 ): Promise<ActionResult> {
-  const res = await apiFetch(`/api/v1/reservations/${reservationId}/invoice`, {
+  // Invoices are generated through the billing endpoint, keyed by reservation.
+  const res = await apiFetch("/api/v1/invoices", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reservationId }),
   });
-  if (!res.ok) return { ok: false, error: `Could not generate invoice (${res.status}).` };
+  if (!res.ok) return fail(res, "Could not generate invoice");
   revalidatePath("/dashboard/invoices");
   revalidatePath("/dashboard/reservations");
-  return { ok: true };
+  return ok;
 }

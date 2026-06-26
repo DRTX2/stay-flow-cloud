@@ -61,7 +61,15 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Serialize enums as their string names (e.g. "Confirmed", "Available") so the public
+        // JSON contract is human-readable and stable against numeric reordering. Accepts the name
+        // (case-insensitive) or the integer on the way in too.
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {

@@ -6,13 +6,24 @@ import type { ServiceItem } from "@/types/api";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataTable } from "@/components/shared/data-table/DataTable";
 import { DataTableColumnHeader } from "@/components/shared/data-table/DataTableColumnHeader";
-import { money2 } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { humanizeEnum, money2 } from "@/lib/format";
 
 const columns: ColumnDef<ServiceItem>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
     cell: ({ row }) => <span className="font-medium">{row.original.name ?? "—"}</span>,
+  },
+  {
+    accessorKey: "category",
+    header: "Category",
+    cell: ({ row }) =>
+      row.original.category ? (
+        <Badge variant="secondary">{humanizeEnum(String(row.original.category))}</Badge>
+      ) : (
+        "—"
+      ),
   },
   {
     accessorKey: "description",

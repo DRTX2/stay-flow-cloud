@@ -29,6 +29,12 @@ export function number(value?: number | null): string {
   return new Intl.NumberFormat().format(value);
 }
 
+/** Insert spaces into a PascalCase enum name, e.g. "FoodAndBeverage" → "Food And Beverage". */
+export function humanizeEnum(value?: string | null): string {
+  if (!value) return "—";
+  return value.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+}
+
 export function initials(name?: string): string {
   if (!name) return "U";
   return name
