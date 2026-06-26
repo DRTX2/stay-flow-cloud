@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { SERVICE_CATEGORIES } from "@/types/api";
+import { SERVICE_CATEGORIES, type ServiceCategory, type ServiceItem } from "@/types/api";
 import { humanizeEnum } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +35,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createServiceAction } from "@/app/dashboard/services/actions";
+import {
+  createServiceAction,
+  updateServiceAction,
+} from "@/app/dashboard/services/actions";
 
 const schema = z.object({
   name: z.string().min(1, "Required").max(120),
@@ -46,41 +49,71 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export function CreateServiceDialog() {
-  const [open, setOpen] = useState(false);
+function asCategory(value?: ServiceCategory | string): ServiceCategory {
+  return SERVICE_CATEGORIES.includes(value as ServiceCategory)
+    ? (value as ServiceCategory)
+    : "FoodAndBeverage";
+}
+
+interface Props {
+  service?: ServiceItem;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function ServiceFormDialog({
+  service,
+  open: controlledOpen,
+  onOpenChange,
+}: Props) {
+  const isEdit = !!service;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [pending, startTransition] = useTransition();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", price: 0, category: "FoodAndBeverage", description: "" },
+    defaultValues: {
+      name: service?.name ?? "",
+      price: service?.price ?? 0,
+      category: asCategory(service?.category),
+      description: service?.description ?? "",
+    },
   });
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
-      const result = await createServiceAction(values);
+      const result = isEdit
+        ? await updateServiceAction(service.id, values)
+        : await createServiceAction(values);
       if (result.ok) {
-        toast.success("Service created");
-        form.reset();
+        toast.success(isEdit ? "Service updated" : "Service created");
+        if (!isEdit) form.reset();
         setOpen(false);
       } else {
-        toast.error(result.error ?? "Could not create service");
+        toast.error(result.error ?? "Could not save service");
       }
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          New service
-        </Button>
-      </DialogTrigger>
+      {!isEdit && (
+        <DialogTrigger asChild>
+          <Button size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            New service
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New service</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit service" : "New service"}</DialogTitle>
           <DialogDescription>
-            Add a sellable extra such as breakfast, spa or transfers.
+            {isEdit
+              ? "Update this sellable extra."
+              : "Add a sellable extra such as breakfast, spa or transfers."}
           </DialogDescription>
         </DialogHeader>
 
@@ -158,7 +191,7 @@ export function CreateServiceDialog() {
               </Button>
               <Button type="submit" disabled={pending}>
                 {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create
+                {isEdit ? "Save" : "Create"}
               </Button>
             </DialogFooter>
           </form>

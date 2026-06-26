@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { getList } from "@/server/api";
 import type { ServiceItem } from "@/types/api";
 import { ServicesTable } from "@/features/services/ServicesTable";
-import { CreateServiceDialog } from "@/features/services/CreateServiceDialog";
+import { ServiceFormDialog } from "@/features/services/ServiceFormDialog";
 
 export const metadata: Metadata = { title: "Services" };
 
@@ -14,7 +14,7 @@ export default async function ServicesPage() {
       <PageHeader
         title="Services"
         description="Sellable extras attached to stays."
-        actions={<CreateServiceDialog />}
+        actions={<ServiceFormDialog />}
       />
       <ServicesTable data={services} />
     </div>

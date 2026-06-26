@@ -19,3 +19,17 @@ export async function createServiceAction(
   revalidatePath("/dashboard/services");
   return ok;
 }
+
+export async function updateServiceAction(
+  id: string,
+  input: CreateServiceRequest,
+): Promise<ActionResult> {
+  const res = await apiFetch(`/api/v1/services/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return fail(res, "Could not update service");
+  revalidatePath("/dashboard/services");
+  return ok;
+}

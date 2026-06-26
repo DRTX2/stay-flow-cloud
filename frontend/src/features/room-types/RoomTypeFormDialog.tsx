@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import type { RoomType } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,7 +27,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { createRoomTypeAction } from "@/app/dashboard/room-types/actions";
+import {
+  createRoomTypeAction,
+  updateRoomTypeAction,
+} from "@/app/dashboard/room-types/actions";
 
 const schema = z.object({
   name: z.string().min(1, "Required").max(100),
@@ -37,41 +41,65 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export function CreateRoomTypeDialog() {
-  const [open, setOpen] = useState(false);
+interface Props {
+  roomType?: RoomType;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function RoomTypeFormDialog({
+  roomType,
+  open: controlledOpen,
+  onOpenChange,
+}: Props) {
+  const isEdit = !!roomType;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [pending, startTransition] = useTransition();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", baseRate: 0, maxOccupancy: 2, description: "" },
+    defaultValues: {
+      name: roomType?.name ?? "",
+      baseRate: roomType?.baseRate ?? 0,
+      maxOccupancy: roomType?.maxOccupancy ?? 2,
+      description: roomType?.description ?? "",
+    },
   });
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
-      const result = await createRoomTypeAction(values);
+      const result = isEdit
+        ? await updateRoomTypeAction(roomType.id, values)
+        : await createRoomTypeAction(values);
       if (result.ok) {
-        toast.success("Room type created");
-        form.reset();
+        toast.success(isEdit ? "Room type updated" : "Room type created");
+        if (!isEdit) form.reset();
         setOpen(false);
       } else {
-        toast.error(result.error ?? "Could not create room type");
+        toast.error(result.error ?? "Could not save room type");
       }
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          New room type
-        </Button>
-      </DialogTrigger>
+      {!isEdit && (
+        <DialogTrigger asChild>
+          <Button size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            New room type
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New room type</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit room type" : "New room type"}</DialogTitle>
           <DialogDescription>
-            Define a rate plan and occupancy template for this property.
+            {isEdit
+              ? "Update this rate plan and occupancy template."
+              : "Define a rate plan and occupancy template for this property."}
           </DialogDescription>
         </DialogHeader>
 
@@ -141,7 +169,7 @@ export function CreateRoomTypeDialog() {
               </Button>
               <Button type="submit" disabled={pending}>
                 {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create
+                {isEdit ? "Save" : "Create"}
               </Button>
             </DialogFooter>
           </form>

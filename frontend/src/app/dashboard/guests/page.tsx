@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { getList } from "@/server/api";
 import type { Guest } from "@/types/api";
 import { GuestsTable } from "@/features/guests/GuestsTable";
-import { CreateGuestDialog } from "@/features/guests/CreateGuestDialog";
+import { GuestFormDialog } from "@/features/guests/GuestFormDialog";
 
 export const metadata: Metadata = { title: "Guests" };
 
@@ -14,7 +14,7 @@ export default async function GuestsPage() {
       <PageHeader
         title="Guests"
         description="Guest profiles for this tenant."
-        actions={<CreateGuestDialog />}
+        actions={<GuestFormDialog />}
       />
       <GuestsTable data={guests} />
     </div>

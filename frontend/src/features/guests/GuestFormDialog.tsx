@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import type { Guest } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,7 +26,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { createGuestAction } from "@/app/dashboard/guests/actions";
+import { createGuestAction, updateGuestAction } from "@/app/dashboard/guests/actions";
 
 const schema = z.object({
   firstName: z.string().min(1, "Required").max(100),
@@ -37,46 +38,65 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export function CreateGuestDialog() {
-  const [open, setOpen] = useState(false);
+interface Props {
+  /** Present → edit mode; absent → create mode. */
+  guest?: Guest;
+  /** Controlled open state (used when triggered from a table row). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function GuestFormDialog({ guest, open: controlledOpen, onOpenChange }: Props) {
+  const isEdit = !!guest;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [pending, startTransition] = useTransition();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      documentNumber: "",
+      firstName: guest?.firstName ?? "",
+      lastName: guest?.lastName ?? "",
+      email: guest?.email ?? "",
+      phone: guest?.phone ?? "",
+      documentNumber: guest?.documentNumber ?? "",
     },
   });
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
-      const result = await createGuestAction(values);
+      const result = isEdit
+        ? await updateGuestAction(guest.id, values)
+        : await createGuestAction(values);
       if (result.ok) {
-        toast.success("Guest created");
-        form.reset();
+        toast.success(isEdit ? "Guest updated" : "Guest created");
+        if (!isEdit) form.reset();
         setOpen(false);
       } else {
-        toast.error(result.error ?? "Could not create guest");
+        toast.error(result.error ?? "Could not save guest");
       }
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          New guest
-        </Button>
-      </DialogTrigger>
+      {!isEdit && (
+        <DialogTrigger asChild>
+          <Button size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            New guest
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New guest</DialogTitle>
-          <DialogDescription>Add a guest profile for this property.</DialogDescription>
+          <DialogTitle>{isEdit ? "Edit guest" : "New guest"}</DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Update this guest's profile."
+              : "Add a guest profile for this property."}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -157,7 +177,7 @@ export function CreateGuestDialog() {
               </Button>
               <Button type="submit" disabled={pending}>
                 {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create
+                {isEdit ? "Save" : "Create"}
               </Button>
             </DialogFooter>
           </form>

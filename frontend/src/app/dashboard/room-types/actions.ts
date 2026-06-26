@@ -19,3 +19,17 @@ export async function createRoomTypeAction(
   revalidatePath("/dashboard/room-types");
   return ok;
 }
+
+export async function updateRoomTypeAction(
+  id: string,
+  input: CreateRoomTypeRequest,
+): Promise<ActionResult> {
+  const res = await apiFetch(`/api/v1/roomtypes/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return fail(res, "Could not update room type");
+  revalidatePath("/dashboard/room-types");
+  return ok;
+}

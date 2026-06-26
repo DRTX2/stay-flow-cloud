@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { getList } from "@/server/api";
 import type { RoomType } from "@/types/api";
 import { RoomTypesTable } from "@/features/room-types/RoomTypesTable";
-import { CreateRoomTypeDialog } from "@/features/room-types/CreateRoomTypeDialog";
+import { RoomTypeFormDialog } from "@/features/room-types/RoomTypeFormDialog";
 
 export const metadata: Metadata = { title: "Room Types" };
 
@@ -14,7 +14,7 @@ export default async function RoomTypesPage() {
       <PageHeader
         title="Room Types"
         description="Rate plans and occupancy templates."
-        actions={<CreateRoomTypeDialog />}
+        actions={<RoomTypeFormDialog />}
       />
       <RoomTypesTable data={roomTypes} />
     </div>
