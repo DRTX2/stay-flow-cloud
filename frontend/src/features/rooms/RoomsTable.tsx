@@ -6,7 +6,10 @@ import { BedDouble, MoreHorizontal, Tag } from "lucide-react";
 import { toast } from "sonner";
 import type { Room } from "@/types/api";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { DataTable } from "@/components/shared/data-table/DataTable";
+import {
+  DataTable,
+  type ServerTableConfig,
+} from "@/components/shared/data-table/DataTable";
 import { DataTableColumnHeader } from "@/components/shared/data-table/DataTableColumnHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -91,7 +94,13 @@ function roomColumns(onPrice: (r: Room) => void): ColumnDef<Room>[] {
   ];
 }
 
-export function RoomsTable({ data }: { data: Room[] }) {
+export function RoomsTable({
+  data,
+  pagination,
+}: {
+  data: Room[];
+  pagination?: ServerTableConfig;
+}) {
   const [pricing, setPricing] = useState<Room | null>(null);
   const [price, setPrice] = useState("");
   const [pending, startTransition] = useTransition();
@@ -126,6 +135,7 @@ export function RoomsTable({ data }: { data: Room[] }) {
         data={data}
         searchPlaceholder="Search rooms…"
         exportFileName="rooms.csv"
+        serverPagination={pagination}
         emptyState={
           <EmptyState
             icon={BedDouble}

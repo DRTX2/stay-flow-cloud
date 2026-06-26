@@ -1,6 +1,7 @@
 import "server-only";
 import { serverConfig } from "@/server/config";
 import { getAccessToken } from "@/server/auth/session";
+import type { PagedResult } from "@/types/api";
 
 /** Thrown for non-2xx API responses; `status` lets callers special-case 401/403/404. */
 export class ApiError extends Error {
@@ -45,6 +46,39 @@ export async function getJson<T>(path: string, options?: ApiOptions): Promise<T>
   const res = await apiFetch(path, options);
   if (!res.ok) throw new ApiError(res.status, `GET ${path} → ${res.status}`);
   return (await res.json()) as T;
+}
+
+export interface PageQuery {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+}
+
+/** Fetch a paged endpoint and normalize the envelope to a {@link PagedResult}. */
+export async function getPaged<T>(
+  path: string,
+  query: PageQuery = {},
+  options?: ApiOptions,
+): Promise<PagedResult<T>> {
+  const params = new URLSearchParams();
+  if (query.page) params.set("page", String(query.page));
+  if (query.pageSize) params.set("pageSize", String(query.pageSize));
+  if (query.search) params.set("search", query.search);
+  if (query.status) params.set("status", query.status);
+  const qs = params.toString();
+  const url = qs ? `${path}?${qs}` : path;
+
+  const res = await apiFetch(url, options);
+  if (!res.ok) throw new ApiError(res.status, `GET ${url} → ${res.status}`);
+  const data = (await res.json()) as Partial<PagedResult<T>> & { items?: T[] };
+  const items = Array.isArray(data.items) ? data.items : [];
+  const page = data.page ?? query.page ?? 1;
+  const pageSize = data.pageSize ?? query.pageSize ?? items.length;
+  const totalCount = data.totalCount ?? items.length;
+  const totalPages =
+    data.totalPages ?? Math.max(1, Math.ceil(totalCount / Math.max(pageSize, 1)));
+  return { items, page, pageSize, totalCount, totalPages };
 }
 
 /** The API returns either a bare array or a paged envelope ({ items: [...] }); normalize. */

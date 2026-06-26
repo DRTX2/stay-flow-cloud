@@ -8,6 +8,15 @@ export interface Paged<T> {
   pageSize?: number;
 }
 
+/** Normalized paged envelope matching the backend `PagedResult<T>`. */
+export interface PagedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface DashboardSummary {
   totalReservations?: number;
   occupancyRate?: number;

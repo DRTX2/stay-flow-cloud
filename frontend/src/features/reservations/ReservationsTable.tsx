@@ -6,7 +6,10 @@ import { toast } from "sonner";
 import type { Reservation } from "@/types/api";
 import type { ActionResult } from "@/server/actions";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { DataTable } from "@/components/shared/data-table/DataTable";
+import {
+  DataTable,
+  type ServerTableConfig,
+} from "@/components/shared/data-table/DataTable";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,7 +28,13 @@ import {
 } from "@/app/dashboard/reservations/actions";
 import { reservationColumns } from "./columns";
 
-export function ReservationsTable({ data }: { data: Reservation[] }) {
+export function ReservationsTable({
+  data,
+  pagination,
+}: {
+  data: Reservation[];
+  pagination?: ServerTableConfig;
+}) {
   const [toCancel, setToCancel] = useState<Reservation | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -80,6 +89,7 @@ export function ReservationsTable({ data }: { data: Reservation[] }) {
         data={data}
         searchPlaceholder="Search reservations…"
         exportFileName="reservations.csv"
+        serverPagination={pagination}
         emptyState={
           <EmptyState
             icon={CalendarX}

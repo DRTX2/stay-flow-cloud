@@ -28,6 +28,17 @@ import {
 import { downloadFile } from "@/lib/csv";
 import { DataTablePagination } from "./DataTablePagination";
 import { DataTableViewOptions } from "./DataTableViewOptions";
+import { ServerPagination } from "./ServerPagination";
+import { ServerSearchInput } from "./ServerSearchInput";
+
+/** When provided, the table delegates paging (and optionally search) to the server via the URL. */
+export interface ServerTableConfig {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  search?: { value: string; placeholder?: string };
+}
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -39,6 +50,8 @@ interface DataTableProps<TData, TValue> {
   toolbar?: ReactNode;
   emptyState?: ReactNode;
   pageSize?: number;
+  /** Switches the table to server-side pagination/search driven by URL params. */
+  serverPagination?: ServerTableConfig;
 }
 
 export function DataTable<TData, TValue>({
@@ -50,11 +63,14 @@ export function DataTable<TData, TValue>({
   toolbar,
   emptyState,
   pageSize = 10,
+  serverPagination,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [globalFilter, setGlobalFilter] = useState("");
+
+  const server = serverPagination;
 
   // TanStack Table returns non-memoizable functions; the React Compiler auto-skips this component,
   // so silence the advisory rule here.
@@ -70,8 +86,15 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize } },
+    // In server mode the data is already a single page; skip the client paginator.
+    ...(server
+      ? {
+          manualPagination: true,
+          manualFiltering: true,
+          pageCount: Math.max(server.totalPages, 1),
+        }
+      : { getPaginationRowModel: getPaginationRowModel() }),
+    initialState: { pagination: { pageSize: server ? server.pageSize : pageSize } },
   });
 
   function exportCsv() {
@@ -93,16 +116,27 @@ export function DataTable<TData, TValue>({
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            placeholder={searchPlaceholder}
-            aria-label="Search table"
-            className="pl-8"
-          />
-        </div>
+        {server ? (
+          server.search ? (
+            <ServerSearchInput
+              initialValue={server.search.value}
+              placeholder={server.search.placeholder ?? searchPlaceholder}
+            />
+          ) : (
+            <div className="w-full sm:max-w-xs" />
+          )
+        ) : (
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              placeholder={searchPlaceholder}
+              aria-label="Search table"
+              className="pl-8"
+            />
+          </div>
+        )}
         <div className="flex items-center gap-2 sm:ml-auto">
           {toolbar}
           {exportFileName && (
@@ -172,7 +206,16 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      <DataTablePagination table={table} />
+      {server ? (
+        <ServerPagination
+          page={server.page}
+          pageSize={server.pageSize}
+          totalCount={server.totalCount}
+          totalPages={server.totalPages}
+        />
+      ) : (
+        <DataTablePagination table={table} />
+      )}
     </div>
   );
 }

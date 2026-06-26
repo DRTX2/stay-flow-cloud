@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, initials, money, number, percent } from "./format";
+import { formatDate, humanizeEnum, initials, money, number, percent } from "./format";
 
 describe("format", () => {
   it("formats money and falls back to em dash", () => {
@@ -26,5 +26,11 @@ describe("format", () => {
   it("derives initials", () => {
     expect(initials("Ada Lovelace")).toBe("AL");
     expect(initials(undefined)).toBe("U");
+  });
+
+  it("humanizes PascalCase enum names", () => {
+    expect(humanizeEnum("FoodAndBeverage")).toBe("Food And Beverage");
+    expect(humanizeEnum("Spa")).toBe("Spa");
+    expect(humanizeEnum(undefined)).toBe("—");
   });
 });

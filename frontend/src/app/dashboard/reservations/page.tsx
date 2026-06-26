@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { getList } from "@/server/api";
+import { getList, getPaged } from "@/server/api";
+import { parsePageParams, type SearchParams } from "@/lib/pagination";
 import type { Guest, Reservation, Room } from "@/types/api";
 import { ReservationsTable } from "@/features/reservations/ReservationsTable";
 import { CreateReservationDialog } from "@/features/reservations/CreateReservationDialog";
@@ -13,19 +14,26 @@ function guestName(g: Guest): string {
   );
 }
 
-export default async function ReservationsPage() {
-  // Reservations for the table; guests + rooms feed the create dialog's selects and let us
-  // resolve the human-readable guest/room labels the list endpoint returns only as ids.
+export default async function ReservationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const { page, pageSize } = parsePageParams(await searchParams);
+
+  // The reservations table is server-paged; guests + rooms feed the create dialog's selects and
+  // let us resolve the human-readable labels the list endpoint returns only as ids (fetched with
+  // a generous page so look-ups cover the whole tenant, not just the current reservations page).
   const [reservations, guests, rooms] = await Promise.all([
-    getList<Reservation>("/api/v1/reservations"),
-    getList<Guest>("/api/v1/guests"),
-    getList<Room>("/api/v1/rooms"),
+    getPaged<Reservation>("/api/v1/reservations", { page, pageSize }),
+    getList<Guest>("/api/v1/guests?pageSize=200"),
+    getList<Room>("/api/v1/rooms?pageSize=200"),
   ]);
 
   const guestById = new Map(guests.map((g) => [g.id, g]));
   const roomById = new Map(rooms.map((r) => [r.id, r]));
 
-  const enriched: Reservation[] = reservations.map((r) => {
+  const enriched: Reservation[] = reservations.items.map((r) => {
     const guest = r.guestId ? guestById.get(r.guestId) : undefined;
     const room = r.roomId ? roomById.get(r.roomId) : undefined;
     return {
@@ -43,7 +51,15 @@ export default async function ReservationsPage() {
         description="Manage bookings across the property."
         actions={<CreateReservationDialog guests={guests} rooms={rooms} />}
       />
-      <ReservationsTable data={enriched} />
+      <ReservationsTable
+        data={enriched}
+        pagination={{
+          page: reservations.page,
+          pageSize: reservations.pageSize,
+          totalCount: reservations.totalCount,
+          totalPages: reservations.totalPages,
+        }}
+      />
     </div>
   );
 }

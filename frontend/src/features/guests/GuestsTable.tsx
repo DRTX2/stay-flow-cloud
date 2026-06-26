@@ -5,7 +5,10 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Users, MoreHorizontal, Pencil } from "lucide-react";
 import type { Guest } from "@/types/api";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { DataTable } from "@/components/shared/data-table/DataTable";
+import {
+  DataTable,
+  type ServerTableConfig,
+} from "@/components/shared/data-table/DataTable";
 import { DataTableColumnHeader } from "@/components/shared/data-table/DataTableColumnHeader";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -82,7 +85,13 @@ function guestColumns(onEdit: (g: Guest) => void): ColumnDef<Guest>[] {
   ];
 }
 
-export function GuestsTable({ data }: { data: Guest[] }) {
+export function GuestsTable({
+  data,
+  pagination,
+}: {
+  data: Guest[];
+  pagination?: ServerTableConfig;
+}) {
   const [editing, setEditing] = useState<Guest | null>(null);
 
   return (
@@ -92,6 +101,7 @@ export function GuestsTable({ data }: { data: Guest[] }) {
         data={data}
         searchPlaceholder="Search guests…"
         exportFileName="guests.csv"
+        serverPagination={pagination}
         emptyState={
           <EmptyState
             icon={Users}

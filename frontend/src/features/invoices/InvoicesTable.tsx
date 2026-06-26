@@ -6,7 +6,10 @@ import { ReceiptText, MoreHorizontal, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Invoice } from "@/types/api";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { DataTable } from "@/components/shared/data-table/DataTable";
+import {
+  DataTable,
+  type ServerTableConfig,
+} from "@/components/shared/data-table/DataTable";
 import { DataTableColumnHeader } from "@/components/shared/data-table/DataTableColumnHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -89,7 +92,13 @@ function invoiceColumns(
   ];
 }
 
-export function InvoicesTable({ data }: { data: Invoice[] }) {
+export function InvoicesTable({
+  data,
+  pagination,
+}: {
+  data: Invoice[];
+  pagination?: ServerTableConfig;
+}) {
   const [pending, startTransition] = useTransition();
 
   function handlePay(invoice: Invoice) {
@@ -106,6 +115,7 @@ export function InvoicesTable({ data }: { data: Invoice[] }) {
       data={data}
       searchPlaceholder="Search invoices…"
       exportFileName="invoices.csv"
+      serverPagination={pagination}
       emptyState={
         <EmptyState
           icon={ReceiptText}
