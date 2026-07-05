@@ -70,6 +70,11 @@ function roomColumns(onPrice: (r: Room) => void): ColumnDef<Room>[] {
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
+      accessorKey: "cleaningStatus",
+      header: "Cleaning",
+      cell: ({ row }) => <StatusBadge status={row.original.cleaningStatus} />,
+    },
+    {
       id: "actions",
       enableHiding: false,
       cell: ({ row }) => (

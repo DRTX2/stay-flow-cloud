@@ -1,8 +1,9 @@
 # StayFlow Cloud — Frontend (Next.js)
 
-Enterprise frontend for StayFlow Cloud, built with **Next.js 16 (App Router)** and **React 19**.
-It is both the public marketing/booking site and the authenticated management dashboard, talking to
-the .NET API through a **Backend-for-Frontend (BFF)** auth layer.
+Product frontend for StayFlow Cloud, a modern hotel operating system built around three core flows:
+property onboarding, reservation-to-checkout, and daily hotel operations. It combines the public
+booking/guest portal with the authenticated staff dashboard, talking to the .NET API through a
+**Backend-for-Frontend (BFF)** auth layer.
 
 ## Stack
 
@@ -63,8 +64,8 @@ npm run dev                  # http://localhost:3000
 ```
 
 Bring the backend up first (`docker compose up` from the repo root). The dev server proxies
-`/connect/*` and `/api/backend/*` to the API. Sign in with the seeded
-`admin@stayflow.local` / `Admin123$`.
+`/connect/*` and `/api/backend/*` to the API. Sign in with the seeded local admin configured via
+`.env`/`appsettings.Development.json`; never reuse local demo credentials in production.
 
 ## Scripts
 

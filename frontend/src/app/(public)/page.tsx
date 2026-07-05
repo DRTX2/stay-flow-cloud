@@ -2,9 +2,10 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowRight,
-  BarChart3,
+  BedDouble,
   CalendarCheck,
-  CreditCard,
+  ClipboardList,
+  Hotel,
   ShieldCheck,
   Star,
 } from "lucide-react";
@@ -16,26 +17,21 @@ import { getHotels } from "@/content/hotels";
 // Marketing landing is fully static (SSG).
 export const dynamic = "force-static";
 
-const FEATURES = [
+const PRODUCT_FLOWS = [
+  {
+    icon: Hotel,
+    title: "Launch a property",
+    body: "Set up rooms, room types, pricing, services, staff roles and tenant features for one hotel or a group.",
+  },
   {
     icon: CalendarCheck,
-    title: "Reservations & front desk",
-    body: "Take bookings, manage check-ins and room status from one fast console.",
+    title: "Book to checkout",
+    body: "Move a guest from public booking to reservation, check-in, service orders, invoice and payment status.",
   },
   {
-    icon: CreditCard,
-    title: "Billing & invoicing",
-    body: "Generate invoices from stays with tax handling and multi-currency support.",
-  },
-  {
-    icon: BarChart3,
-    title: "Executive analytics",
-    body: "Revenue, occupancy, ADR and RevPAR with live dashboards.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Secure multi-tenant",
-    body: "Tenant isolation, OAuth2/OIDC, audit trails and role-based access.",
+    icon: ClipboardList,
+    title: "Run daily operations",
+    body: "Coordinate housekeeping, maintenance, room status, F&B orders, reports and operational visibility.",
   },
 ];
 
@@ -48,32 +44,41 @@ export default async function MarketingPage() {
       {/* Hero */}
       <section className="mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 sm:py-28">
         <p className="mx-auto mb-4 w-fit rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
-          Hospitality management platform
+          Modern hotel operating system
         </p>
         <h1 className="mx-auto max-w-3xl text-balance text-4xl font-bold tracking-tight sm:text-6xl">
-          Run your hotel on a platform built for modern hospitality.
+          Run every stay from booking to checkout.
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-balance text-lg text-muted-foreground">
-          Reservations, front desk, billing and analytics — multi-tenant, secure and fast.
-          Give guests a beautiful booking experience and your team a powerful console.
+          StayFlow Cloud gives hotel teams one workflow for property setup, reservations,
+          front desk operations, housekeeping, billing and guest self-service.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Button asChild size="lg">
             <Link href="/hotels">
-              Explore hotels <ArrowRight className="ml-2 h-4 w-4" />
+              Start a booking <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="/pricing">View pricing</Link>
+            <Link href="/dashboard">Open operator dashboard</Link>
           </Button>
         </div>
       </section>
 
-      {/* Features */}
+      {/* Product flows */}
       <section className="border-t bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {FEATURES.map((f) => (
+          <div className="mb-8 max-w-2xl">
+            <h2 className="text-2xl font-bold tracking-tight">
+              Three workflows that prove the product.
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              The cloud architecture, security and automation exist to make these hotel
+              workflows reliable, not to distract from them.
+            </p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {PRODUCT_FLOWS.map((f) => (
               <Card key={f.title}>
                 <CardContent className="p-6">
                   <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -84,6 +89,24 @@ export default async function MarketingPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Trust bar */}
+      <section className="border-y">
+        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-8 text-sm text-muted-foreground sm:grid-cols-3 sm:px-6">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            Tenant isolation, RBAC and audit trails
+          </div>
+          <div className="flex items-center gap-2">
+            <BedDouble className="h-4 w-4 text-primary" />
+            Inventory, room status and operations in one place
+          </div>
+          <div className="flex items-center gap-2">
+            <CalendarCheck className="h-4 w-4 text-primary" />
+            Guest-facing booking plus staff-facing control
           </div>
         </div>
       </section>

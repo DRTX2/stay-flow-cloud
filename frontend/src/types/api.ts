@@ -18,15 +18,58 @@ export interface PagedResult<T> {
 }
 
 export interface DashboardSummary {
+  date?: string;
+  totalRooms?: number;
+  occupiedRooms?: number;
   totalReservations?: number;
   occupancyRate?: number;
+  arrivalsToday?: number;
+  departuresToday?: number;
+  inHouse?: number;
+  reservationsByStatus?: Record<string, number>;
+  invoicesByStatus?: Record<string, number>;
+  bookedRevenueLast30Days?: number;
   revenue?: number;
   adr?: number;
   revPar?: number;
   availableRooms?: number;
   totalGuests?: number;
-  arrivalsToday?: number;
-  departuresToday?: number;
+}
+
+export interface FrontDeskReservationItem {
+  reservationId: string;
+  confirmationCode?: string;
+  guestId: string;
+  guestName?: string;
+  roomId: string;
+  roomNumber?: string;
+  status?: string;
+  checkIn?: string;
+  checkOut?: string;
+  guests?: number;
+}
+
+export interface FrontDeskRoomIssue {
+  roomId: string;
+  roomNumber?: string;
+  roomStatus?: string;
+  cleaningStatus?: string;
+  openHousekeepingTasks?: number;
+  openMaintenanceWorkOrders?: number;
+}
+
+export interface FrontDeskToday {
+  date?: string;
+  arrivals?: number;
+  departures?: number;
+  inHouse?: number;
+  dirtyRooms?: number;
+  outOfServiceRooms?: number;
+  pendingHousekeepingTasks?: number;
+  openMaintenanceWorkOrders?: number;
+  arrivalList?: FrontDeskReservationItem[];
+  departureList?: FrontDeskReservationItem[];
+  roomIssues?: FrontDeskRoomIssue[];
 }
 
 export interface RevenuePoint {
@@ -34,6 +77,14 @@ export interface RevenuePoint {
   period?: string;
   amount?: number;
   revenue?: number;
+  checkouts?: number;
+}
+
+export interface RevenueReport {
+  from?: string;
+  to?: string;
+  total?: number;
+  daily?: RevenuePoint[];
 }
 
 export type ReservationStatus =
@@ -76,6 +127,7 @@ export interface Room {
   basePrice?: number;
   capacity?: number;
   status?: string;
+  cleaningStatus?: string;
   floor?: number;
 }
 
@@ -174,6 +226,34 @@ export interface TenantFeature {
   key?: string;
   name?: string;
   enabled?: boolean;
+  includedInPlan?: boolean;
+  requiredPlan?: string;
+}
+
+export interface PlanLimits {
+  maxRooms?: number;
+  maxUsers?: number;
+  maxServiceItems?: number;
+}
+
+export interface TenantFeaturesResponse {
+  plan?: string;
+  limits?: PlanLimits;
+  features?: Record<string, boolean>;
+  featureDetails?: TenantFeature[];
+}
+
+export interface StaffUser {
+  id: string;
+  fullName?: string;
+  email?: string;
+  isActive?: boolean;
+  roles?: string[];
+}
+
+export interface StaffUsersResponse {
+  assignableRoles?: string[];
+  users?: StaffUser[];
 }
 
 export interface DocumentItem {
@@ -220,4 +300,130 @@ export interface BookingRequest {
   fullName: string;
   email: string;
   phone?: string;
+}
+
+// --- Operations Expansion ---------------------------------------------------
+
+export interface HousekeepingTask {
+  id: string;
+  roomId: string;
+  taskType?: string;
+  status?: string;
+  assignedToId?: string;
+  notes?: string;
+  createdAtUtc?: string;
+  completedAtUtc?: string;
+}
+
+export interface WorkOrder {
+  id: string;
+  roomId?: string;
+  description?: string;
+  priority?: string;
+  status?: string;
+  reportedById?: string;
+  assignedToId?: string;
+  resolutionNotes?: string;
+  createdAtUtc?: string;
+  resolvedAtUtc?: string;
+}
+
+export interface RoomRackReservation {
+  reservationId: string;
+  confirmationCode?: string;
+  guestId: string;
+  guestName?: string;
+  checkIn?: string;
+  checkOut?: string;
+  status?: string;
+}
+
+export interface RoomRackRoom {
+  roomId: string;
+  roomNumber?: string;
+  roomTypeName?: string;
+  roomStatus?: string;
+  cleaningStatus?: string;
+  reservations?: RoomRackReservation[];
+}
+
+export interface RoomRack {
+  from?: string;
+  to?: string;
+  rooms?: RoomRackRoom[];
+}
+
+export interface SetupStep {
+  key: string;
+  label?: string;
+  completed?: boolean;
+  count?: number;
+  nextHref?: string;
+}
+
+export interface SetupChecklist {
+  completedSteps?: number;
+  totalSteps?: number;
+  percentComplete?: number;
+  steps?: SetupStep[];
+}
+
+export interface GuestReservationHistory {
+  id: string;
+  roomId?: string;
+  roomNumber?: string;
+  checkIn?: string;
+  checkOut?: string;
+  status?: string;
+  totalPrice?: number;
+  confirmationCode?: string;
+}
+
+export interface GuestInvoiceSummary {
+  id: string;
+  reservationId?: string;
+  number?: string;
+  status?: string;
+  total?: number;
+  paidAtUtc?: string;
+}
+
+export interface GuestProfile {
+  guest: Guest;
+  totalStays?: number;
+  lifetimeValue?: number;
+  lastStay?: string;
+  reservations?: GuestReservationHistory[];
+  invoices?: GuestInvoiceSummary[];
+}
+
+export interface SampleStay {
+  guestId: string;
+  roomId: string;
+  reservationId: string;
+  serviceItemId: string;
+  chargeId: string;
+  invoiceId: string;
+  confirmationCode?: string;
+  invoiceNumber?: string;
+  invoiceTotal?: number;
+}
+
+export interface OrderLineItem {
+  serviceItemId: string;
+  serviceName?: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Order {
+  id: string;
+  reservationId: string;
+  status?: string;
+  notes?: string;
+  totalAmount: number;
+  createdAtUtc?: string;
+  deliveredAtUtc?: string;
+  items?: OrderLineItem[];
 }

@@ -1,4 +1,6 @@
 import {
+  BarChart3,
+  CalendarDays,
   CalendarCheck,
   BedDouble,
   LayoutGrid,
@@ -6,9 +8,13 @@ import {
   ReceiptText,
   ConciergeBell,
   LayoutDashboard,
+  Plug,
   ScrollText,
   ToggleRight,
   FileText,
+  ClipboardList,
+  Wrench,
+  Utensils,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,23 +42,30 @@ export const navSections: NavSection[] = [
     title: "Operations",
     items: [
       { href: "/dashboard/reservations", label: "Reservations", icon: CalendarCheck },
+      { href: "/dashboard/room-rack", label: "Room Rack", icon: CalendarDays },
       { href: "/dashboard/rooms", label: "Rooms", icon: BedDouble },
       { href: "/dashboard/room-types", label: "Room Types", icon: LayoutGrid },
       { href: "/dashboard/guests", label: "Guests", icon: Users },
       { href: "/dashboard/services", label: "Services", icon: ConciergeBell },
+      { href: "/dashboard/orders", label: "Orders (F&B)", icon: Utensils },
+      { href: "/dashboard/housekeeping", label: "Housekeeping", icon: ClipboardList },
+      { href: "/dashboard/maintenance", label: "Maintenance", icon: Wrench },
       { href: "/dashboard/invoices", label: "Invoices", icon: ReceiptText },
+      { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
     ],
   },
   {
     title: "Administration",
     items: [
       { href: "/dashboard/documents", label: "Documents", icon: FileText },
+      { href: "/dashboard/staff", label: "Staff & Roles", icon: Users },
       {
         href: "/dashboard/tenant-features",
-        label: "Tenant Features",
+        label: "Plan & Features",
         icon: ToggleRight,
       },
       { href: "/dashboard/audit", label: "Audit Log", icon: ScrollText },
+      { href: "/dashboard/integrations", label: "Integrations", icon: Plug },
     ],
   },
 ];

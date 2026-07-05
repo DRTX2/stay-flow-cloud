@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Users, MoreHorizontal, Pencil } from "lucide-react";
+import { Users, MoreHorizontal, Pencil, UserRoundSearch } from "lucide-react";
 import type { Guest } from "@/types/api";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
@@ -74,6 +75,11 @@ function guestColumns(onEdit: (g: Guest) => void): ColumnDef<Guest>[] {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/guests/${row.original.id}`}>
+                  <UserRoundSearch className="h-4 w-4" /> Profile 360
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(row.original)}>
                 <Pencil className="h-4 w-4" /> Edit
               </DropdownMenuItem>
