@@ -6,24 +6,34 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using StayFlow.Application.Common.Authorization;
 using StayFlow.Infrastructure;
+using StayFlow.Persistence;
 using StayFlow.Persistence.Identity;
 
 namespace StayFlow.Api.Controllers;
 
 /// <summary>
-/// OAuth2 token endpoint and identity introspection. Handles the token-issuing grants — password
-/// (first-party SPA), client-credentials (machine-to-machine), refresh-token rotation, and the
-/// Authorization Code exchange (PKCE). The interactive authorize/login lives in
-/// <see cref="AuthorizeController"/> and <see cref="AccountController"/>.
+/// OAuth2 token endpoint and identity introspection. Handles the token-issuing grants:
+/// - Authorization Code + PKCE exchange (primary interactive flow for human users)
+/// - Client Credentials (machine-to-machine for ERP integrations)
+/// - Refresh Token rotation (silent renewal)
+///
+/// Password (ROPC) grant is intentionally NOT supported. It cannot be made secure in a modern
+/// SaaS: it exposes credentials to the client, blocks MFA, and breaks phishing-resistant auth.
+/// The interactive authorize/login lives in <see cref="AuthorizeController"/> and
+/// <see cref="AccountController"/>.
 /// </summary>
 [ApiController]
 public sealed class AuthController(
     UserManager<ApplicationUser> userManager,
-    RoleManager<ApplicationRole> roleManager) : ControllerBase
+    RoleManager<ApplicationRole> roleManager,
+    StayFlowDbContext dbContext,
+    IWebHostEnvironment environment,
+    IConfiguration configuration) : ControllerBase
 {
     [HttpPost("~/connect/token"), Produces("application/json")]
     [EnableRateLimiting("auth")]
@@ -32,19 +42,23 @@ public sealed class AuthController(
         var request = HttpContext.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
-        if (request.IsPasswordGrantType())
-        {
-            return await HandlePasswordGrantAsync(request);
-        }
-
         if (request.IsClientCredentialsGrantType())
         {
-            return HandleClientCredentialsGrant(request);
+            return await HandleClientCredentialsGrantAsync(request);
         }
 
         if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType())
         {
             return await HandleStoredPrincipalGrantAsync();
+        }
+
+        // Password grant is disabled. Return a clear error so clients that still attempt it
+        // get an actionable message rather than a generic 400.
+        if (request.IsPasswordGrantType())
+        {
+            return Forbidden(
+                OpenIddictConstants.Errors.UnsupportedGrantType,
+                "The password grant type is disabled. Use Authorization Code + PKCE.");
         }
 
         return Forbidden(OpenIddictConstants.Errors.UnsupportedGrantType, "The specified grant type is not supported.");
@@ -61,34 +75,48 @@ public sealed class AuthController(
         permissions = User.FindAll(AuthConstants.PermissionClaim).Select(c => c.Value),
     });
 
-    private async Task<IActionResult> HandlePasswordGrantAsync(OpenIddictRequest request)
-    {
-        var user = await userManager.FindByNameAsync(request.Username!);
-        if (user is null || !user.IsActive || !await userManager.CheckPasswordAsync(user, request.Password!))
-        {
-            return Forbidden(OpenIddictConstants.Errors.InvalidGrant, "Invalid username or password.");
-        }
-
-        var identity = NewIdentity();
-        identity.SetClaim(OpenIddictConstants.Claims.Subject, user.Id.ToString())
-            .SetClaim(OpenIddictConstants.Claims.Name, user.UserName)
-            .SetClaim(OpenIddictConstants.Claims.Email, user.Email)
-            .SetClaim(AuthConstants.TenantClaim, user.TenantId.ToString());
-
-        var roles = await userManager.GetRolesAsync(user);
-        identity.SetClaims(OpenIddictConstants.Claims.Role, [.. roles]);
-        identity.SetClaims(AuthConstants.PermissionClaim, [.. await ResolvePermissionsAsync(roles)]);
-
-        return SignInWith(identity, request.GetScopes());
-    }
-
-    private Microsoft.AspNetCore.Mvc.SignInResult HandleClientCredentialsGrant(OpenIddictRequest request)
+    private async Task<Microsoft.AspNetCore.Mvc.SignInResult> HandleClientCredentialsGrantAsync(OpenIddictRequest request)
     {
         var identity = NewIdentity();
         identity.SetClaim(OpenIddictConstants.Claims.Subject, request.ClientId)
             .SetClaim(OpenIddictConstants.Claims.Name, request.ClientId);
 
-        // Machine clients get read access to the public API surface for this demo.
+        if (environment.IsDevelopment() && request.ClientId == AuthConstants.Clients.TestAdmin)
+        {
+            var tenantId = await dbContext.Tenants.IgnoreQueryFilters()
+                .Where(tenant => tenant.Slug == "grand-demo")
+                .Select(tenant => tenant.Id)
+                .FirstOrDefaultAsync();
+
+            if (tenantId != Guid.Empty)
+            {
+                identity.SetClaim(AuthConstants.TenantClaim, tenantId.ToString());
+            }
+
+            identity.SetClaims(AuthConstants.PermissionClaim, Permissions.All.ToImmutableArray());
+            return SignInWith(identity, request.GetScopes());
+        }
+
+        if (!string.IsNullOrWhiteSpace(configuration["Authentication:SmokeClientId"])
+            && request.ClientId == configuration["Authentication:SmokeClientId"])
+        {
+            var tenantSlug = configuration["Authentication:SmokeTenantSlug"] ?? "grand-demo";
+            var tenantId = await dbContext.Tenants.IgnoreQueryFilters()
+                .Where(tenant => tenant.Slug == tenantSlug)
+                .Select(tenant => tenant.Id)
+                .FirstOrDefaultAsync();
+
+            if (tenantId != Guid.Empty)
+            {
+                identity.SetClaim(AuthConstants.TenantClaim, tenantId.ToString());
+            }
+
+            identity.SetClaims(AuthConstants.PermissionClaim, [Permissions.AnalyticsView]);
+            return SignInWith(identity, request.GetScopes());
+        }
+
+        // Machine clients get read access to the public API surface.
+        // Expand permissions here or inject them from client claims as needed.
         identity.SetClaims(AuthConstants.PermissionClaim,
         [
             Permissions.RoomsRead, Permissions.ReservationsRead, Permissions.GuestsRead,
@@ -97,9 +125,9 @@ public sealed class AuthController(
         return SignInWith(identity, request.GetScopes());
     }
 
-    // Shared by the authorization-code exchange and refresh-token rotation: OpenIddict restores the
-    // principal (and its claim destinations) stashed when the code/refresh token was issued. We only
-    // re-validate that the account is still active before re-issuing tokens; destinations are kept.
+    // Shared by the Authorization Code exchange and Refresh Token rotation: OpenIddict restores the
+    // principal stashed when the code/refresh token was issued. We only re-validate that the account
+    // is still active before re-issuing tokens.
     private async Task<IActionResult> HandleStoredPrincipalGrantAsync()
     {
         var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);

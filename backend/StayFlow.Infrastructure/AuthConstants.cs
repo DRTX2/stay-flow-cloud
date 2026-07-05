@@ -14,13 +14,18 @@ public static class AuthConstants
 
     public static class Clients
     {
-        /// <summary>Public SPA/first-party client using the password (ROPC) grant.</summary>
+        /// <summary>Public SPA/first-party client — uses Authorization Code + PKCE only.</summary>
         public const string Spa = "stayflow-spa";
 
         /// <summary>Confidential machine client using the client-credentials grant.</summary>
         public const string Service = "stayflow-service";
 
-        /// <summary>Development secret for the confidential service client.</summary>
-        public const string ServiceSecret = "stayflow-service-secret";
+        /// <summary>Development/test-only machine client with elevated permissions for automated tests.</summary>
+        public const string TestAdmin = "stayflow-test-admin";
+
+        // ServiceSecret is NO LONGER a compile-time constant.
+        // It is read from configuration key "Authentication:ServiceClientSecret"
+        // at seeding time, falling back to a generated secret in development only.
+        // See DataSeeder.SeedClientsAsync.
     }
 }

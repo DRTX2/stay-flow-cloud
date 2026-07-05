@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenIddict.Abstractions;
@@ -14,32 +15,49 @@ using StayFlow.Persistence.Identity;
 namespace StayFlow.Infrastructure.Identity;
 
 /// <summary>
-/// Applies migrations and seeds the baseline data the platform needs to be navigable on a fresh
-/// database: OAuth2 clients and scopes, the built-in roles with their permission claims, a demo
-/// tenant, a super-admin login and a little sample inventory. Idempotent — safe to run on boot.
+/// Seeds the baseline data the platform needs to be navigable on a fresh database: OAuth2 clients
+/// and scopes, the built-in roles with their permission claims, a demo tenant, a super-admin login
+/// and sample inventory.
+///
+/// IMPORTANT: This seeder must ONLY be invoked from the StayFlow.MigrationHost CLI tool or from
+/// integration-test setup. It must never run automatically on API startup in production.
+///
+/// Idempotent — safe to run multiple times.
 /// </summary>
-public sealed class DataSeeder(IServiceProvider serviceProvider, ILogger<DataSeeder> logger)
+public sealed class DataSeeder(
+    IServiceProvider serviceProvider,
+    ILogger<DataSeeder> logger,
+    IConfiguration configuration)
 {
-    // Demo credentials. Fine for a portfolio/dev environment; never ship real secrets like this.
-    public const string AdminEmail = "admin@stayflow.local";
-    public const string AdminPassword = "Admin123$";
+    // Configuration keys — values come from environment variables or secrets, never from source code.
+    internal const string AdminEmailKey = "Seeding:AdminEmail";
+    internal const string AdminPasswordKey = "Seeding:AdminPassword";
+    internal const string ServiceClientSecretKey = "Authentication:ServiceClientSecret";
+    private const string SmokeClientIdKey = "Authentication:SmokeClientId";
+    private const string SmokeClientSecretKey = "Authentication:SmokeClientSecret";
+
+    // Fallback defaults are ONLY used when running in Development and the keys are absent.
+    // They are intentionally weak/obvious so developers know immediately this is not for production.
+    private const string DevFallbackEmail = "admin@stayflow.local";
+    private const string DevFallbackPassword = "Admin123$";
+    private const string DevFallbackServiceSecret = "dev-service-secret-change-in-prod";
+    private const string DevFallbackTestAdminSecret = "dev-test-admin-secret";
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
         await using var scope = serviceProvider.CreateAsyncScope();
         var services = scope.ServiceProvider;
 
-        var context = services.GetRequiredService<StayFlowDbContext>();
-        await context.Database.MigrateAsync(cancellationToken);
-
         await SeedScopesAsync(services, cancellationToken);
-        await SeedClientsAsync(services, cancellationToken);
+        await SeedClientsAsync(services, configuration, cancellationToken);
         await SeedRolesAsync(services);
+
+        var context = services.GetRequiredService<StayFlowDbContext>();
         var tenantId = await SeedDemoTenantAsync(context, cancellationToken);
-        await SeedAdminUserAsync(services, tenantId);
+        await SeedAdminUserAsync(services, configuration, tenantId);
         await SeedSampleInventoryAsync(context, tenantId, cancellationToken);
 
-        logger.LogInformation("Seed complete. Admin login: {Email} / {Password}", AdminEmail, AdminPassword);
+        logger.LogInformation("Seed complete. Check Seeding:AdminEmail configuration for login credentials.");
     }
 
     private static async Task SeedScopesAsync(IServiceProvider services, CancellationToken cancellationToken)
@@ -58,39 +76,39 @@ public sealed class DataSeeder(IServiceProvider serviceProvider, ILogger<DataSee
         }, cancellationToken);
     }
 
-    private static async Task SeedClientsAsync(IServiceProvider services, CancellationToken cancellationToken)
+    private static async Task SeedClientsAsync(
+        IServiceProvider services,
+        IConfiguration configuration,
+        CancellationToken cancellationToken)
     {
         var manager = services.GetRequiredService<IOpenIddictApplicationManager>();
+        var isDev = configuration.GetValue<bool>("IsDevelopment");
+
+        var spaRedirectUris = GetConfiguredUris(
+            configuration,
+            "Authentication:SpaRedirectUris",
+            ["http://localhost:3000/api/auth/callback", "http://localhost:5173/callback"]);
+        var spaPostLogoutRedirectUris = GetConfiguredUris(
+            configuration,
+            "Authentication:SpaPostLogoutRedirectUris",
+            ["http://localhost:3000/", "http://localhost:5173/"]);
 
         if (await manager.FindByClientIdAsync(AuthConstants.Clients.Spa, cancellationToken) is null)
         {
-            await manager.CreateAsync(new OpenIddictApplicationDescriptor
+            var spaClient = new OpenIddictApplicationDescriptor
             {
                 ClientId = AuthConstants.Clients.Spa,
                 ClientType = OpenIddictConstants.ClientTypes.Public,
                 DisplayName = "StayFlow SPA (first-party)",
-                // Authorization Code + PKCE callbacks. The Next.js BFF completes the flow
-                // server-side at /api/auth/callback (tokens land in httpOnly cookies); the
-                // 5173 entries remain for the legacy Vite SPA / local tooling.
-                RedirectUris =
-                {
-                    new Uri("http://localhost:3000/api/auth/callback"),
-                    new Uri("http://localhost:5173/callback"),
-                },
-                PostLogoutRedirectUris =
-                {
-                    new Uri("http://localhost:3000/"),
-                    new Uri("http://localhost:5173/"),
-                },
                 Permissions =
                 {
                     OpenIddictConstants.Permissions.Endpoints.Token,
                     OpenIddictConstants.Permissions.Endpoints.Authorization,
                     OpenIddictConstants.Permissions.Endpoints.EndSession,
-                    // Authorization Code + PKCE for the browser app; password kept for first-party
-                    // scripting/tests; refresh for silent renewal.
+                    // Authorization Code + PKCE is the ONLY interactive grant.
+                    // Password / ROPC grant is disabled — it is a legacy flow that cannot
+                    // support MFA, phishing-resistant auth, or proper token storage.
                     OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
-                    OpenIddictConstants.Permissions.GrantTypes.Password,
                     OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
                     OpenIddictConstants.Permissions.ResponseTypes.Code,
                     OpenIddictConstants.Permissions.Prefixes.Scope + AuthConstants.ApiScope,
@@ -102,15 +120,42 @@ public sealed class DataSeeder(IServiceProvider serviceProvider, ILogger<DataSee
                 {
                     OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange,
                 },
-            }, cancellationToken);
+            };
+
+            foreach (var redirectUri in spaRedirectUris)
+            {
+                spaClient.RedirectUris.Add(redirectUri);
+            }
+
+            foreach (var postLogoutRedirectUri in spaPostLogoutRedirectUris)
+            {
+                spaClient.PostLogoutRedirectUris.Add(postLogoutRedirectUri);
+            }
+
+            await manager.CreateAsync(spaClient, cancellationToken);
         }
 
         if (await manager.FindByClientIdAsync(AuthConstants.Clients.Service, cancellationToken) is null)
         {
+            // Secret must come from configuration (environment variable / secrets manager).
+            // In development without the key set, a fallback is used and a warning is emitted.
+            var serviceSecret = configuration[ServiceClientSecretKey];
+            if (string.IsNullOrWhiteSpace(serviceSecret))
+            {
+                if (!isDev)
+                {
+                    throw new InvalidOperationException(
+                        $"Configuration key '{ServiceClientSecretKey}' is required in non-development environments. " +
+                        "Set it via an environment variable or secrets manager.");
+                }
+
+                serviceSecret = DevFallbackServiceSecret;
+            }
+
             await manager.CreateAsync(new OpenIddictApplicationDescriptor
             {
                 ClientId = AuthConstants.Clients.Service,
-                ClientSecret = AuthConstants.Clients.ServiceSecret,
+                ClientSecret = serviceSecret,
                 ClientType = OpenIddictConstants.ClientTypes.Confidential,
                 DisplayName = "StayFlow service (machine-to-machine)",
                 Permissions =
@@ -121,6 +166,63 @@ public sealed class DataSeeder(IServiceProvider serviceProvider, ILogger<DataSee
                 },
             }, cancellationToken);
         }
+
+        if (isDev && await manager.FindByClientIdAsync(AuthConstants.Clients.TestAdmin, cancellationToken) is null)
+        {
+            await manager.CreateAsync(new OpenIddictApplicationDescriptor
+            {
+                ClientId = AuthConstants.Clients.TestAdmin,
+                ClientSecret = DevFallbackTestAdminSecret,
+                ClientType = OpenIddictConstants.ClientTypes.Confidential,
+                DisplayName = "StayFlow test admin (development only)",
+                Permissions =
+                {
+                    OpenIddictConstants.Permissions.Endpoints.Token,
+                    OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
+                    OpenIddictConstants.Permissions.Prefixes.Scope + AuthConstants.ApiScope,
+                },
+            }, cancellationToken);
+        }
+
+        var smokeClientId = configuration[SmokeClientIdKey];
+        var smokeClientSecret = configuration[SmokeClientSecretKey];
+        if (!string.IsNullOrWhiteSpace(smokeClientId) && !string.IsNullOrWhiteSpace(smokeClientSecret)
+            && await manager.FindByClientIdAsync(smokeClientId, cancellationToken) is null)
+        {
+            await manager.CreateAsync(new OpenIddictApplicationDescriptor
+            {
+                ClientId = smokeClientId,
+                ClientSecret = smokeClientSecret,
+                ClientType = OpenIddictConstants.ClientTypes.Confidential,
+                DisplayName = "StayFlow staging smoke tests",
+                Permissions =
+                {
+                    OpenIddictConstants.Permissions.Endpoints.Token,
+                    OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
+                    OpenIddictConstants.Permissions.Prefixes.Scope + AuthConstants.ApiScope,
+                },
+            }, cancellationToken);
+        }
+    }
+
+    private static Uri[] GetConfiguredUris(
+        IConfiguration configuration,
+        string key,
+        IReadOnlyCollection<string> defaultValues)
+    {
+        var values = configuration.GetSection(key)
+            .GetChildren()
+            .Select(section => section.Value)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .ToArray();
+
+        if (values.Length == 0)
+        {
+            values = defaultValues.ToArray();
+        }
+
+        return values.Select(value => new Uri(value, UriKind.Absolute)).ToArray();
     }
 
     private static async Task SeedRolesAsync(IServiceProvider services)
@@ -148,7 +250,7 @@ public sealed class DataSeeder(IServiceProvider serviceProvider, ILogger<DataSee
         }
     }
 
-    private static async Task<Guid> SeedDemoTenantAsync(StayFlowDbContext context, CancellationToken cancellationToken)
+    private async Task<Guid> SeedDemoTenantAsync(StayFlowDbContext context, CancellationToken cancellationToken)
     {
         const string slug = "grand-demo";
         var tenant = await context.Tenants.IgnoreQueryFilters()
@@ -161,27 +263,52 @@ public sealed class DataSeeder(IServiceProvider serviceProvider, ILogger<DataSee
         tenant = Tenant.Create("Grand Demo Hotel", slug, PropertyType.Hotel, "USD");
         context.Tenants.Add(tenant);
         await context.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation("Demo tenant created: {Slug}", slug);
         return tenant.Id;
     }
 
-    private async Task SeedAdminUserAsync(IServiceProvider services, Guid tenantId)
+    private async Task SeedAdminUserAsync(IServiceProvider services, IConfiguration config, Guid tenantId)
     {
+        var isDev = config.GetValue<bool>("IsDevelopment");
+
+        var adminEmail = config[AdminEmailKey];
+        var adminPassword = config[AdminPasswordKey];
+
+        if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword))
+        {
+            if (!isDev)
+            {
+                throw new InvalidOperationException(
+                    $"Configuration keys '{AdminEmailKey}' and '{AdminPasswordKey}' are required in non-development environments. " +
+                    "Set them via environment variables or a secrets manager.");
+            }
+
+            adminEmail ??= DevFallbackEmail;
+            adminPassword ??= DevFallbackPassword;
+
+            logger.LogWarning(
+                "Admin credentials not configured. Using development fallbacks. " +
+                "Set '{EmailKey}' and '{PasswordKey}' in configuration before deploying to production.",
+                AdminEmailKey, AdminPasswordKey);
+        }
+
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
-        if (await userManager.FindByEmailAsync(AdminEmail) is not null)
+        if (await userManager.FindByEmailAsync(adminEmail) is not null)
         {
             return;
         }
 
         var admin = new ApplicationUser
         {
-            UserName = AdminEmail,
-            Email = AdminEmail,
+            UserName = adminEmail,
+            Email = adminEmail,
             EmailConfirmed = true,
             FullName = "Platform Administrator",
             TenantId = tenantId,
         };
 
-        var result = await userManager.CreateAsync(admin, AdminPassword);
+        var result = await userManager.CreateAsync(admin, adminPassword);
         if (!result.Succeeded)
         {
             var errors = string.Join("; ", result.Errors.Select(e => e.Description));
@@ -190,6 +317,9 @@ public sealed class DataSeeder(IServiceProvider serviceProvider, ILogger<DataSee
         }
 
         await userManager.AddToRoleAsync(admin, Roles.SuperAdmin);
+
+        // Log only that the admin was created, NEVER the password.
+        logger.LogInformation("Admin user created: {Email}", adminEmail);
     }
 
     private static async Task SeedSampleInventoryAsync(StayFlowDbContext context, Guid tenantId, CancellationToken cancellationToken)

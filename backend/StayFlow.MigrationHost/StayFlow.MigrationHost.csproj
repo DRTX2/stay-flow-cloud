@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>StayFlow.MigrationHost</RootNamespace>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+        <PackageReference Include="OpenIddict.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+        <PackageReference Include="Serilog.AspNetCore" />
+        <PackageReference Include="Serilog.Sinks.Console" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\StayFlow.Infrastructure\StayFlow.Infrastructure.csproj" />
+        <ProjectReference Include="..\StayFlow.Persistence\StayFlow.Persistence.csproj" />
+    </ItemGroup>
+
+</Project>

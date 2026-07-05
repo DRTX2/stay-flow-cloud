@@ -5,8 +5,9 @@ using Testcontainers.PostgreSql;
 namespace StayFlow.IntegrationTests;
 
 /// <summary>
-/// Boots the real API in-process against a throwaway PostgreSQL container. Program.cs applies
-/// migrations and seeds the demo data on startup, so tests run against a realistic environment.
+/// Boots the real API in-process against a throwaway PostgreSQL container.
+/// The test factory enables Database:RunMigrationsOnStartup so the throwaway database is prepared
+/// during test host startup. Production does not set that switch.
 /// </summary>
 public sealed class StayFlowApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
@@ -14,7 +15,10 @@ public sealed class StayFlowApiFactory : WebApplicationFactory<Program>, IAsyncL
         .WithImage("postgres:16-alpine")
         .Build();
 
-    public async Task InitializeAsync() => await _database.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await _database.StartAsync();
+    }
 
     async Task IAsyncLifetime.DisposeAsync()
     {
@@ -27,5 +31,11 @@ public sealed class StayFlowApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:Default", _database.GetConnectionString());
         builder.UseSetting("RateLimiting:Enabled", "false");
+        builder.UseSetting("Database:RunMigrationsOnStartup", "true");
+        // Dev fallback credentials for seeding in tests.
+        builder.UseSetting("IsDevelopment", "true");
+        builder.UseSetting("Seeding:AdminEmail", "admin@stayflow.local");
+        builder.UseSetting("Seeding:AdminPassword", "Admin123$");
+        builder.UseSetting("Authentication:ServiceClientSecret", "dev-service-secret-change-in-prod");
     }
 }

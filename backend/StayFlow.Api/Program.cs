@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Serilog;
 using StayFlow.Api.Middleware;
@@ -75,14 +76,16 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "StayFlow Cloud API", Version = "v1" });
 
-    // Let Swagger UI obtain tokens from the password grant against the OpenIddict token endpoint.
+    // Swagger UI uses Authorization Code + PKCE — the same secure flow as the production SPA.
+    // No password grant. No client secret exposed to the browser.
     options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.OAuth2,
         Flows = new OpenApiOAuthFlows
         {
-            Password = new OpenApiOAuthFlow
+            AuthorizationCode = new OpenApiOAuthFlow
             {
+                AuthorizationUrl = new Uri("/connect/authorize", UriKind.Relative),
                 TokenUrl = new Uri("/connect/token", UriKind.Relative),
                 Scopes = new Dictionary<string, string>
                 {
@@ -105,7 +108,13 @@ app.UseSerilogRequestLogging();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(options => options.OAuthClientId(AuthConstants.Clients.Spa));
+    app.UseSwaggerUI(options =>
+    {
+        options.OAuthClientId(AuthConstants.Clients.Spa);
+        // Enable PKCE in Swagger UI — required since we removed password grant.
+        options.OAuthUsePkce();
+        options.OAuthScopes(AuthConstants.ApiScope);
+    });
 }
 
 app.UseAuthentication();
@@ -123,8 +132,23 @@ app.MapControllers();
 app.MapObservability();
 app.UseBackgroundJobs();
 
-// Apply migrations and seed baseline data (clients, roles, admin, demo tenant) on startup.
-await app.Services.GetRequiredService<DataSeeder>().SeedAsync();
+if (builder.Configuration.GetValue("Database:RunMigrationsOnStartup", false))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var context = scope.ServiceProvider.GetRequiredService<StayFlowDbContext>();
+    await context.Database.MigrateAsync();
+    await scope.ServiceProvider.GetRequiredService<DataSeeder>().SeedAsync();
+}
+
+// IMPORTANT: Migrations and seeding are NO LONGER run on API startup.
+// Run them explicitly using the StayFlow.MigrationHost CLI tool before deploying the API:
+//
+//   dotnet run --project backend/StayFlow.MigrationHost -- migrate
+//   dotnet run --project backend/StayFlow.MigrationHost -- seed
+//
+// This prevents race conditions in multi-replica deployments and separates the migrator
+// database user (schema-level permissions) from the app user (data-level permissions only).
+// The Database:RunMigrationsOnStartup switch exists only for integration/contract tests.
 
 app.Run();
 

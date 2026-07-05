@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<ITenantProvider, TenantProvider>();
         services.AddScoped<IFeatureService, FeatureService>();
+        services.AddScoped<IStaffAdministrationService, StaffAdministrationService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddSingleton<INotificationService, LoggingNotificationService>();
         services.AddSingleton<DataSeeder>();
@@ -69,13 +70,15 @@ public static class DependencyInjection
                     .SetEndSessionEndpointUris("connect/logout")
                     .SetUserInfoEndpointUris("connect/userinfo");
 
-                options.AllowPasswordFlow()
+                // Authorization Code + PKCE is the primary (and only human-facing) interactive
+                // grant. Password / ROPC is intentionally disabled — it cannot support MFA,
+                // phishing-resistant auth, or proper token binding.
+                // Client Credentials handles machine-to-machine (ERP, integrations).
+                // Refresh Token enables silent renewal without re-authentication.
+                options.AllowAuthorizationCodeFlow()
+                    .RequireProofKeyForCodeExchange()
                     .AllowClientCredentialsFlow()
                     .AllowRefreshTokenFlow();
-
-                // Authorization Code + PKCE for the browser SPA and external API integrators.
-                options.AllowAuthorizationCodeFlow()
-                    .RequireProofKeyForCodeExchange();
 
                 options.RegisterScopes(
                     AuthConstants.ApiScope,
@@ -85,11 +88,24 @@ public static class DependencyInjection
                     OpenIddictConstants.Scopes.Roles,
                     OpenIddictConstants.Scopes.OfflineAccess);
 
-                // Ephemeral keys keep dev frictionless on Linux (no cert store needed). Tokens
-                // are invalidated on restart — acceptable for a demo. Swap for persisted X.509
-                // certificates (or Secrets Manager-backed keys) in production.
-                options.AddEphemeralEncryptionKey()
-                    .AddEphemeralSigningKey();
+                // Development: use ephemeral keys (no cert store required, tokens invalidate on restart).
+                // Production: replace with persisted X.509 certificates loaded from Key Vault or
+                // the ASP.NET Data Protection key ring. Never use ephemeral keys in production.
+                if (isDevelopment)
+                {
+                    options.AddEphemeralEncryptionKey()
+                        .AddEphemeralSigningKey();
+                }
+                else
+                {
+                    // In production, inject signing/encryption certificates via:
+                    // options.AddSigningCertificate(certificate)
+                    // options.AddEncryptionCertificate(certificate)
+                    // Certificates should be loaded from Key Vault or environment-mounted secrets.
+                    options.AddEphemeralEncryptionKey()
+                        .AddEphemeralSigningKey();
+                    // TODO: Replace with real X.509 certificates before going live.
+                }
 
                 // Issue plain JWT access tokens so external API clients and Swagger can read them.
                 options.DisableAccessTokenEncryption();
