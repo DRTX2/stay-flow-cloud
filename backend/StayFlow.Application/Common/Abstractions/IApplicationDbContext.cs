@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using StayFlow.Domain.Billing;
 using StayFlow.Domain.Guests;
+using StayFlow.Domain.Housekeeping;
+using StayFlow.Domain.Maintenance;
+using StayFlow.Domain.Orders;
 using StayFlow.Domain.Reservations;
 using StayFlow.Domain.Rooms;
 using StayFlow.Domain.Services;
@@ -24,6 +27,9 @@ public interface IApplicationDbContext
     DbSet<ReservationCharge> ReservationCharges { get; }
     DbSet<Invoice> Invoices { get; }
     DbSet<TenantFeatureOverride> TenantFeatureOverrides { get; }
+    DbSet<HousekeepingTask> HousekeepingTasks { get; }
+    DbSet<WorkOrder> WorkOrders { get; }
+    DbSet<Order> Orders { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -10,4 +10,5 @@ public sealed record RoomDto(
     decimal BasePrice,
     int Capacity,
     int Floor,
-    RoomStatus Status);
+    RoomStatus Status,
+    RoomCleaningStatus CleaningStatus);

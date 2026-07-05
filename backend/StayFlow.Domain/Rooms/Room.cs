@@ -20,6 +20,7 @@ public sealed class Room : TenantEntity
         Capacity = capacity;
         Floor = floor;
         Status = RoomStatus.Available;
+        CleaningStatus = RoomCleaningStatus.Clean;
     }
 
     public string Number { get; private set; } = string.Empty;
@@ -34,6 +35,8 @@ public sealed class Room : TenantEntity
     public int Floor { get; private set; }
 
     public RoomStatus Status { get; private set; }
+
+    public RoomCleaningStatus CleaningStatus { get; private set; }
 
     public static Room Create(string number, Guid roomTypeId, decimal basePrice, int capacity, int floor = 0)
     {
@@ -70,11 +73,15 @@ public sealed class Room : TenantEntity
         BasePrice = newPrice;
     }
 
+    public void MarkOccupied() => Status = RoomStatus.Occupied;
+
     public void PutUnderMaintenance() => Status = RoomStatus.Maintenance;
 
     public void ReturnToService() => Status = RoomStatus.Available;
 
     public void MarkOutOfService() => Status = RoomStatus.OutOfService;
+
+    public void UpdateCleaningStatus(RoomCleaningStatus status) => CleaningStatus = status;
 
     public bool IsBookable => Status == RoomStatus.Available;
 }

@@ -12,6 +12,9 @@ namespace StayFlow.ContractTests;
 /// </summary>
 public sealed class PublicApiContractTests(ContractApiFactory factory) : IClassFixture<ContractApiFactory>
 {
+    private const string TestAdminClientId = "stayflow-test-admin";
+    private const string TestAdminClientSecret = "dev-test-admin-secret";
+
     [Fact]
     public async Task OpenApiDocument_ExposesDocumentedPublicPaths()
     {
@@ -32,6 +35,13 @@ public sealed class PublicApiContractTests(ContractApiFactory factory) : IClassF
             "/api/v1/Services",
             "/api/v1/Invoices",
             "/api/v1/Analytics/dashboard",
+            "/api/v1/Analytics/front-desk/today",
+            "/api/v1/Analytics/room-rack",
+            "/api/v1/Analytics/setup-checklist",
+            "/api/v1/Reports/revenue.csv",
+            "/api/v1/Staff",
+            "/api/v1/TenantFeatures",
+            "/api/v1/Demo/sample-stay",
             "/connect/token",
         ];
 
@@ -44,17 +54,16 @@ public sealed class PublicApiContractTests(ContractApiFactory factory) : IClassF
     }
 
     [Fact]
-    public async Task TokenEndpoint_PasswordGrant_HonoursOAuthTokenContract()
+    public async Task TokenEndpoint_ClientCredentials_HonoursOAuthTokenContract()
     {
         var client = factory.CreateClient();
 
         var response = await client.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["grant_type"] = "password",
-            ["username"] = "admin@stayflow.local",
-            ["password"] = "Admin123$",
-            ["client_id"] = "stayflow-spa",
-            ["scope"] = "stayflow.api offline_access",
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = TestAdminClientId,
+            ["client_secret"] = TestAdminClientSecret,
+            ["scope"] = "stayflow.api",
         }));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -63,7 +72,7 @@ public sealed class PublicApiContractTests(ContractApiFactory factory) : IClassF
         payload.GetProperty("token_type").GetString().Should().Be("Bearer");
         payload.GetProperty("access_token").GetString().Should().NotBeNullOrWhiteSpace();
         payload.GetProperty("expires_in").GetInt32().Should().BeGreaterThan(0);
-        payload.GetProperty("refresh_token").GetString().Should().NotBeNullOrWhiteSpace();
+        payload.TryGetProperty("refresh_token", out _).Should().BeFalse("client credentials must not issue refresh tokens");
     }
 
     [Fact]
@@ -118,16 +127,114 @@ public sealed class PublicApiContractTests(ContractApiFactory factory) : IClassF
         }
     }
 
+    [Fact]
+    public async Task FrontDeskToday_ExposesOperationalContractShape()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+
+        var board = await client.GetFromJsonAsync<JsonElement>("/api/v1/analytics/front-desk/today");
+
+        foreach (var property in new[]
+        {
+            "date",
+            "arrivals",
+            "departures",
+            "inHouse",
+            "dirtyRooms",
+            "outOfServiceRooms",
+            "pendingHousekeepingTasks",
+            "openMaintenanceWorkOrders",
+            "arrivalList",
+            "departureList",
+            "roomIssues",
+        })
+        {
+            board.TryGetProperty(property, out _).Should().BeTrue("front desk board exposes {0}", property);
+        }
+    }
+
+    [Fact]
+    public async Task RoomRack_ExposesOperationalContractShape()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+
+        var rack = await client.GetFromJsonAsync<JsonElement>("/api/v1/analytics/room-rack");
+
+        foreach (var property in new[] { "from", "to", "rooms" })
+        {
+            rack.TryGetProperty(property, out _).Should().BeTrue("room rack exposes {0}", property);
+        }
+
+        rack.GetProperty("rooms").ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
+    public async Task SetupChecklist_ExposesGuidedSetupContractShape()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+
+        var checklist = await client.GetFromJsonAsync<JsonElement>("/api/v1/analytics/setup-checklist");
+
+        foreach (var property in new[] { "completedSteps", "totalSteps", "percentComplete", "steps" })
+        {
+            checklist.TryGetProperty(property, out _).Should().BeTrue("setup checklist exposes {0}", property);
+        }
+
+        checklist.GetProperty("steps").ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
+    public async Task TenantFeatures_ExposesPlanAndFeatureLockContractShape()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+
+        var features = await client.GetFromJsonAsync<JsonElement>("/api/v1/tenantfeatures");
+
+        foreach (var property in new[] { "plan", "limits", "features", "featureDetails" })
+        {
+            features.TryGetProperty(property, out _).Should().BeTrue("tenant features exposes {0}", property);
+        }
+
+        features.GetProperty("featureDetails").ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
+    public async Task Staff_ExposesAssignableRolesContractShape()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+
+        var staff = await client.GetFromJsonAsync<JsonElement>("/api/v1/staff");
+
+        staff.TryGetProperty("assignableRoles", out _).Should().BeTrue();
+        staff.TryGetProperty("users", out _).Should().BeTrue();
+        var roles = staff.GetProperty("assignableRoles").EnumerateArray().Select(role => role.GetString()).ToList();
+        roles.Should().Contain("FrontDesk");
+        roles.Should().Contain("Housekeeping");
+        roles.Should().Contain("Manager");
+        roles.Should().Contain("Admin");
+    }
+
+    [Fact]
+    public async Task ReportsCsv_ReturnsCsvContent()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync("/api/v1/reports/night-audit.csv");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("text/csv");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Metric,Value");
+    }
+
     private async Task<HttpClient> CreateAuthenticatedClientAsync()
     {
         var client = factory.CreateClient();
 
         var response = await client.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["grant_type"] = "password",
-            ["username"] = "admin@stayflow.local",
-            ["password"] = "Admin123$",
-            ["client_id"] = "stayflow-spa",
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = TestAdminClientId,
+            ["client_secret"] = TestAdminClientSecret,
             ["scope"] = "stayflow.api",
         }));
         response.EnsureSuccessStatusCode();

@@ -22,6 +22,11 @@ public sealed class GuestsController : ApiControllerBase
     public async Task<ActionResult<GuestDto>> GetById(Guid id)
         => Ok(await Sender.Send(new GetGuestByIdQuery(id)));
 
+    [HttpGet("{id:guid}/profile")]
+    [Authorize(Policy = Permissions.GuestsRead)]
+    public async Task<ActionResult<GuestProfileDto>> GetProfile(Guid id)
+        => Ok(await Sender.Send(new GetGuestProfileQuery(id)));
+
     [HttpPost]
     [Authorize(Policy = Permissions.GuestsManage)]
     public async Task<IActionResult> Create([FromBody] CreateGuestCommand command)

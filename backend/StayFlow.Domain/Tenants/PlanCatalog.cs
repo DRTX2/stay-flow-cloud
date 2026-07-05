@@ -32,4 +32,11 @@ public static class PlanCatalog
         };
 
     public static PlanLimits For(SubscriptionPlan plan) => Plans[plan];
+
+    public static SubscriptionPlan RequiredPlanFor(Feature feature)
+        => Plans
+            .Where(plan => plan.Value.Includes(feature))
+            .OrderBy(plan => plan.Key)
+            .Select(plan => plan.Key)
+            .First();
 }

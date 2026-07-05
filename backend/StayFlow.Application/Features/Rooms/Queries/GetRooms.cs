@@ -40,7 +40,8 @@ public sealed class GetRoomsHandler(IApplicationDbContext dbContext)
                 room.BasePrice,
                 room.Capacity,
                 room.Floor,
-                room.Status))
+                room.Status,
+                room.CleaningStatus))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<RoomDto>(items, page, pageSize, totalCount);

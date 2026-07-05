@@ -27,7 +27,8 @@ public sealed class GetRoomByIdHandler(IApplicationDbContext dbContext)
                 room.BasePrice,
                 room.Capacity,
                 room.Floor,
-                room.Status))
+                room.Status,
+                room.CleaningStatus))
             .FirstOrDefaultAsync(cancellationToken);
 
         return dto ?? throw new NotFoundException(nameof(Room), request.Id);

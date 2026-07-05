@@ -24,6 +24,11 @@ public static class Permissions
 
     public const string AnalyticsView = "analytics:view";
 
+    public const string HousekeepingManage = "housekeeping:manage";
+    public const string MaintenanceManage = "maintenance:manage";
+    public const string OrdersManage = "orders:manage";
+    public const string StaffManage = "staff:manage";
+
     /// <summary>Manage the tenant's own feature flags (within plan availability).</summary>
     public const string FeaturesManage = "features:manage";
 
@@ -38,6 +43,10 @@ public static class Permissions
         ServicesRead, ServicesManage,
         BillingRead, BillingManage,
         AnalyticsView,
+        HousekeepingManage,
+        MaintenanceManage,
+        OrdersManage,
+        StaffManage,
         FeaturesManage,
         TenantsManage,
     ];
