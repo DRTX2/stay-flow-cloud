@@ -147,6 +147,16 @@ public static class DependencyInjection
             options.Cookie.Name = "StayFlow.Identity";
             options.Cookie.HttpOnly = true;
             options.ExpireTimeSpan = TimeSpan.FromHours(1);
+            options.Events.OnRedirectToLogin = context =>
+            {
+                context.Response.Redirect(context.RedirectUri);
+                return Task.CompletedTask;
+            };
+            options.Events.OnRedirectToAccessDenied = context =>
+            {
+                context.Response.Redirect(context.RedirectUri);
+                return Task.CompletedTask;
+            };
         });
 
         authentication.AddCookie(IdentityConstants.ExternalScheme, options =>

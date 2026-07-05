@@ -14,7 +14,6 @@ namespace StayFlow.Api.Controllers;
 /// (social) provider sign-in. Establishes the Identity application cookie that
 /// <see cref="AuthorizeController"/> relies on. A real deployment would render these via the SPA.
 /// </summary>
-[ApiController]
 public sealed class AccountController(
     SignInManager<ApplicationUser> signInManager,
     UserManager<ApplicationUser> userManager,

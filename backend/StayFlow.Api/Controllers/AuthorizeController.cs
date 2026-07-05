@@ -18,7 +18,6 @@ namespace StayFlow.Api.Controllers;
 /// the code for a logged-in user), userinfo, and logout. Login itself is handled by
 /// <see cref="AccountController"/> via the Identity application cookie.
 /// </summary>
-[ApiController]
 public sealed class AuthorizeController(
     UserManager<ApplicationUser> userManager,
     RoleManager<ApplicationRole> roleManager) : ControllerBase
