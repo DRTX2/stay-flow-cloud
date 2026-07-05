@@ -32,3 +32,6 @@ Thumbs.db
 *.env
 .env
 appsettings.*.local.json
+
+# FVM Version Cache
+.fvm/

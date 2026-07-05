@@ -10,6 +10,11 @@ outbox + MassTransit, Hangfire, observability, Docker and Terraform. The proposa
 foundation rather than replacing it — they show the ability to *evolve* a system, which is exactly what
 seniority is judged on.
 
+Product rule: do not add advanced architecture just to show tools. Each improvement should strengthen
+one of the three SaaS workflows first: property onboarding, booking-to-checkout, or daily operations.
+If a feature does not improve one of those flows, it belongs in the backlog until the product demo is
+already compelling.
+
 ---
 
 ## 1. Event-driven architecture & microservice extraction

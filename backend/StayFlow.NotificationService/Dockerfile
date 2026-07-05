@@ -8,7 +8,7 @@ WORKDIR /src
 
 # Copy the central package-management props and only the project files this service needs
 # (itself + the shared contracts) so `dotnet restore` is cached until dependencies change.
-COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY .editorconfig global.json Directory.Build.props Directory.Packages.props ./
 COPY StayFlow.NotificationService/StayFlow.NotificationService.csproj StayFlow.NotificationService/
 COPY StayFlow.Contracts/StayFlow.Contracts.csproj StayFlow.Contracts/
 RUN dotnet restore StayFlow.NotificationService/StayFlow.NotificationService.csproj

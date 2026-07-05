@@ -1,30 +1,33 @@
 # Pending work
 
-Snapshot of what remains after the backend/infra/tooling are complete.
+StayFlow should read as a focused hotel SaaS first and a cloud engineering showcase second. The next
+work is sequenced around product proof, then production hardening, then advanced differentiators.
 
-## Not yet built
+## Product proof
 
-- **Further microservice extraction** — the Notification service is extracted (RabbitMQ consumer over
-  the outbox/integration events); next pull Analytics or Billing out of the monolith
-  (`docs/IMPROVEMENTS.md §1`).
+The three workflows below are the product. Every new feature should improve one of them directly.
 
-The dashboard is now full CRUD: create **and edit** dialogs for rooms, room types, guests and
-services (backend `PUT /api/v1/{guests,services,roomtypes}/{id}`), the full reservation lifecycle
-(confirm / check-in / check-out / cancel / generate invoice), room base-price updates, invoice
-"mark as paid", and tenant-feature toggles. Reservations, guests, rooms and invoices use
-**server-side pagination** (deep-linkable `?page/?pageSize/?search`). The Playwright E2E suite runs
-in CI against a live Compose-backed API (`e2e` job). Remaining frontend depth is optional polish
-(bulk actions, richer filtering, a customer self-service portal).
+| Priority | Flow | What would make it stronger |
+|---|---|---|
+| P0 | Launch a property | Guided setup checklist for rooms, room types, services, staff roles and tenant features. |
+| P0 | Booking to checkout | One polished demo path from hotel selection -> booking -> dashboard reservation -> check-in -> service order -> invoice. |
+| P0 | Daily operations | Unified operations board combining room status, housekeeping, maintenance and F&B orders. |
 
-## Nice-to-have hardening
+## Production hardening
 
-- Real OTLP/tracing backend (Tempo/Jaeger) wired in Compose for end-to-end traces.
-- Swap MassTransit in-memory transport for RabbitMQ or Amazon SQS.
-- ACM certificate + HTTPS listener + Route 53 record in the Terraform stack.
-- Remote Terraform backend (S3 + DynamoDB lock) before any team use.
-- MongoDB target for production (DocumentDB or Atlas) — currently optional with a no-op fallback.
+- Keep migrations and seed out of API startup through `StayFlow.MigrationHost` and run it as an explicit
+  deployment step.
+- Use separate database users for migrator and runtime application access.
+- Move Azure PostgreSQL behind private networking once the student-friendly deployment is stable.
+- Add staging -> production promotion with required reviewers and environment-specific configuration.
+- Add SBOM generation, image signing and provenance verification before deployment.
+- Add DAST/smoke tests against deployed staging.
 
-## Future direction
+## Later differentiators
 
-See [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md) for the full enhancement analysis
-(event-driven microservices, gRPC, semantic search / RAG, Kubernetes, DevSecOps, cloud networking).
+- Per-tenant subscription plans and usage metering.
+- AI assistant / semantic search only after the reservation and operations flows feel complete.
+- Further microservice extraction only when a real operational seam justifies it.
+- Real-time operations board with SignalR once daily operations needs push updates.
+
+See [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md) for the broader enhancement catalog.

@@ -55,6 +55,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # One-shot database lifecycle job. Keeps schema changes out of API startup while preserving
+  # a clean `docker compose up --build` experience on a fresh machine.
+  migrate:
+    image: stayflow.migrationhost
+    build:
+      context: ./backend
+      dockerfile: StayFlow.MigrationHost/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      IsDevelopment: "true"
+      STAYFLOW_MIGRATOR_CONNECTION: "Host=postgres;Port=5432;Database=stayflow;Username=postgres;Password=postgres"
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=stayflow;Username=postgres;Password=postgres"
+      Authentication__ServiceClientSecret: "dev-service-secret-change-in-prod"
+      Seeding__AdminEmail: "admin@stayflow.local"
+      Seeding__AdminPassword: "Admin123$"
+    entrypoint: ["sh", "-c", "dotnet StayFlow.MigrationHost.dll migrate && dotnet StayFlow.MigrationHost.dll seed"]
+
   stayflow.api:
     image: stayflow.api
     build:
@@ -69,6 +88,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
