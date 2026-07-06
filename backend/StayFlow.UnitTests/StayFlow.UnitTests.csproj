@@ -20,6 +20,7 @@
     <ItemGroup>
         <ProjectReference Include="..\StayFlow.Application\StayFlow.Application.csproj" />
         <ProjectReference Include="..\StayFlow.Domain\StayFlow.Domain.csproj" />
+        <ProjectReference Include="..\StayFlow.Persistence\StayFlow.Persistence.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -22,8 +22,10 @@ builder.Host.UseSerilog((context, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .WriteTo.Console());
 
-var connectionString = builder.Configuration.GetConnectionString("Default")
+var connectionString = builder.Configuration["STAYFLOW_APP_CONNECTION"]
+    ?? builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("Connection string 'Default' is not configured.");
+connectionString = PostgreSqlConnectionString.Normalize(connectionString);
 
 builder.Services.AddApplication();
 builder.Services.AddPersistence(connectionString);

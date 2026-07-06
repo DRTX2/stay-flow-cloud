@@ -1,19 +1,19 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { buildEndSessionUrl } from "@/server/auth/oidc";
 import { clearAuthCookies } from "@/server/auth/cookies";
-import { serverConfig } from "@/server/config";
 
-/** Clears the BFF session cookies and returns the browser to the site root. */
-function signOut(request: NextRequest) {
-  const response = NextResponse.redirect(new URL("/", serverConfig.siteUrl));
+/** Clears the BFF cookies, then asks the IdP/API to clear its Identity cookie too. */
+function signOut() {
+  const response = NextResponse.redirect(buildEndSessionUrl());
   clearAuthCookies(response.cookies);
   return response;
 }
 
 // POST is the primary path (from the sign-out form/action); GET supports a plain link fallback.
-export async function POST(request: NextRequest) {
-  return signOut(request);
+export async function POST() {
+  return signOut();
 }
 
-export async function GET(request: NextRequest) {
-  return signOut(request);
+export async function GET() {
+  return signOut();
 }

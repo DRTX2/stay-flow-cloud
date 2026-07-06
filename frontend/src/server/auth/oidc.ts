@@ -78,6 +78,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenSet
 /** End-session URL that returns the browser to the site root after sign-out. */
 export function buildEndSessionUrl(): string {
   const params = new URLSearchParams({
+    client_id: serverConfig.oidc.clientId,
     post_logout_redirect_uri: `${serverConfig.siteUrl}/`,
   });
   return `${endSessionEndpoint()}?${params.toString()}`;

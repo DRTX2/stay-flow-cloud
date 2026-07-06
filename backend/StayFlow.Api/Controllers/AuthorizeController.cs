@@ -119,12 +119,14 @@ public sealed class AuthorizeController(
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Logout()
     {
+        var request = HttpContext.GetOpenIddictServerRequest();
+
         await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
 
         // Lets OpenIddict honour post_logout_redirect_uri back to the SPA.
         return SignOut(
             authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-            properties: new AuthenticationProperties { RedirectUri = "/" });
+            properties: new AuthenticationProperties { RedirectUri = request?.PostLogoutRedirectUri ?? "/" });
     }
 
     private async Task<IReadOnlyCollection<string>> ResolvePermissionsAsync(IEnumerable<string> roles)

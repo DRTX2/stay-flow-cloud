@@ -9,6 +9,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddPersistence(this IServiceCollection services, string connectionString)
     {
+        connectionString = PostgreSqlConnectionString.Normalize(connectionString);
+
         services.AddScoped<AuditableEntityInterceptor>();
         services.AddScoped<ConvertDomainEventsToOutboxInterceptor>();
         services.AddScoped<DispatchDomainEventsInterceptor>();

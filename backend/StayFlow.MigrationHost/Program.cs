@@ -24,7 +24,9 @@ using ILogger = Microsoft.Extensions.Logging.ILogger;
 //
 // Connection strings:
 //   STAYFLOW_MIGRATOR_CONNECTION  — used for migrate/rollback/reset (migrator user, DDL perms)
-//   ConnectionStrings__Default    — fallback (app user)
+//   ConnectionStrings__Migrator    — environment fallback for DDL operations
+//   STAYFLOW_APP_CONNECTION       — app user fallback
+//   ConnectionStrings__Default    — app user fallback
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -248,7 +250,9 @@ static void PrintHelp()
 
         Connection strings (checked in order):
           STAYFLOW_MIGRATOR_CONNECTION  For DDL operations (CREATE/ALTER/DROP TABLE)
-          ConnectionStrings__Default    Fallback
+          ConnectionStrings__Migrator    Environment fallback for DDL operations
+          STAYFLOW_APP_CONNECTION       App user fallback
+          ConnectionStrings__Default    App user fallback
 
         Examples:
           dotnet run -- migrate
@@ -289,14 +293,11 @@ static IHost CreateHost(string[] args)
         {
             // The migrator uses the dedicated migrator connection string (DDL-level perms).
             // Fall back to the app connection string if the migrator one is not set.
-            var migratorConnection =
-                ctx.Configuration["STAYFLOW_MIGRATOR_CONNECTION"]
-                ?? ctx.Configuration.GetConnectionString("Migrator")
-                ?? ctx.Configuration["STAYFLOW_APP_CONNECTION"]
-                ?? ctx.Configuration.GetConnectionString("Default")
+            var migratorConnection = ResolveConnectionString(ctx)
                 ?? throw new InvalidOperationException(
                     "No database connection string found. Set STAYFLOW_MIGRATOR_CONNECTION " +
                     "or ConnectionStrings__Default.");
+            migratorConnection = PostgreSqlConnectionString.Normalize(migratorConnection);
 
             services.AddDbContext<StayFlowDbContext>((sp, options) =>
             {
@@ -314,4 +315,26 @@ static IHost CreateHost(string[] args)
                 configuration: ctx.Configuration);
         })
         .Build();
+}
+
+static string? ResolveConnectionString(HostBuilderContext ctx)
+{
+    var connectionString =
+        Environment.GetEnvironmentVariable("STAYFLOW_MIGRATOR_CONNECTION")
+        ?? Environment.GetEnvironmentVariable("ConnectionStrings__Migrator")
+        ?? Environment.GetEnvironmentVariable("STAYFLOW_APP_CONNECTION")
+        ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default");
+
+    if (!string.IsNullOrWhiteSpace(connectionString))
+    {
+        return connectionString;
+    }
+
+    if (!ctx.HostingEnvironment.IsDevelopment())
+    {
+        return null;
+    }
+
+    return ctx.Configuration.GetConnectionString("Migrator")
+        ?? ctx.Configuration.GetConnectionString("Default");
 }

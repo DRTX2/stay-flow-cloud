@@ -4,6 +4,7 @@ using MongoDB.Driver;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using StayFlow.Persistence;
 
 namespace StayFlow.Api.Observability;
 
@@ -22,7 +23,8 @@ public static class ObservabilityExtensions
 
     public static IServiceCollection AddObservability(this IServiceCollection services, IConfiguration configuration)
     {
-        var postgres = configuration.GetConnectionString("Default");
+        var postgres = configuration["STAYFLOW_APP_CONNECTION"] ?? configuration.GetConnectionString("Default");
+        postgres = string.IsNullOrWhiteSpace(postgres) ? postgres : PostgreSqlConnectionString.Normalize(postgres);
         var redis = configuration.GetConnectionString("Redis");
         var mongo = configuration.GetConnectionString("Mongo");
         var otlpEndpoint = configuration["OpenTelemetry:OtlpEndpoint"];

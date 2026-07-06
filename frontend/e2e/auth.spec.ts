@@ -15,4 +15,14 @@ test.describe("Authentication", () => {
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   });
+
+  test("sign out clears both the BFF session and the IdP session", async ({ page }) => {
+    await loginAs(page);
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("menuitem", { name: /sign out/i }).click();
+
+    await expect(page).toHaveURL(/\/$/);
+    await page.goto("/dashboard");
+    await expect(page.getByLabel("Email address")).toBeVisible();
+  });
 });
