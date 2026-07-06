@@ -274,10 +274,37 @@ jobs:
         uses: azure/cli@v2
         with:
           inlineScript: |
-            az containerapp job start \
+            execution_name=$(az containerapp job start \
               --resource-group "$RESOURCE_GROUP" \
               --name "$ENVIRONMENT_NAME-migrations" \
-              --wait
+              --query name \
+              --output tsv)
+
+            echo "Started migration job execution: $execution_name"
+
+            for attempt in $(seq 1 120); do
+              job_status=$(az containerapp job execution show \
+                --resource-group "$RESOURCE_GROUP" \
+                --name "$ENVIRONMENT_NAME-migrations" \
+                --job-execution-name "$execution_name" \
+                --query properties.status \
+                --output tsv)
+
+              echo "Migration job status: $job_status"
+
+              if [ "$job_status" = "Succeeded" ]; then
+                exit 0
+              fi
+
+              if [ "$job_status" = "Failed" ] || [ "$job_status" = "Canceled" ]; then
+                exit 1
+              fi
+
+              sleep 10
+            done
+
+            echo "Migration job timed out waiting for completion."
+            exit 1
 
       - name: Deployment summary
         run: |
