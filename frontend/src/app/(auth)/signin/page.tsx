@@ -8,9 +8,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: "Invalid email or password. Please try again.",
 };
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_OIDC_AUTHORITY ?? "http://localhost:8080";
-
-function SignInForm() {
+function SignInForm({ apiOrigin }: { apiOrigin: string }) {
   const params = useSearchParams();
   const returnUrl = params.get("ReturnUrl") ?? "/";
   const error = params.get("error");
@@ -18,7 +16,7 @@ function SignInForm() {
     ? (ERROR_MESSAGES[error] ?? "Sign-in failed. Please try again.")
     : null;
 
-  const action = `${API_ORIGIN}/account/login`;
+  const action = `${apiOrigin}/account/login`;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-6">
@@ -103,7 +101,9 @@ function SignInForm() {
 export default function SignInPage() {
   return (
     <Suspense fallback={null}>
-      <SignInForm />
+      <SignInForm
+        apiOrigin={process.env.NEXT_PUBLIC_OIDC_AUTHORITY ?? "http://localhost:8080"}
+      />
     </Suspense>
   );
 }

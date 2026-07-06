@@ -93,7 +93,8 @@ public sealed class DataSeeder(
             "Authentication:SpaPostLogoutRedirectUris",
             ["http://localhost:3000/", "http://localhost:5173/"]);
 
-        if (await manager.FindByClientIdAsync(AuthConstants.Clients.Spa, cancellationToken) is null)
+        var spaApplication = await manager.FindByClientIdAsync(AuthConstants.Clients.Spa, cancellationToken);
+        if (spaApplication is null)
         {
             var spaClient = new OpenIddictApplicationDescriptor
             {
@@ -133,6 +134,29 @@ public sealed class DataSeeder(
             }
 
             await manager.CreateAsync(spaClient, cancellationToken);
+        }
+        else
+        {
+            var descriptor = new OpenIddictApplicationDescriptor();
+            await manager.PopulateAsync(descriptor, spaApplication, cancellationToken);
+
+            var changed = false;
+            foreach (var redirectUri in spaRedirectUris.Where(uri => !descriptor.RedirectUris.Contains(uri)))
+            {
+                descriptor.RedirectUris.Add(redirectUri);
+                changed = true;
+            }
+
+            foreach (var postLogoutRedirectUri in spaPostLogoutRedirectUris.Where(uri => !descriptor.PostLogoutRedirectUris.Contains(uri)))
+            {
+                descriptor.PostLogoutRedirectUris.Add(postLogoutRedirectUri);
+                changed = true;
+            }
+
+            if (changed)
+            {
+                await manager.UpdateAsync(spaApplication, descriptor, cancellationToken);
+            }
         }
 
         if (await manager.FindByClientIdAsync(AuthConstants.Clients.Service, cancellationToken) is null)
@@ -294,32 +318,58 @@ public sealed class DataSeeder(
         }
 
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
-        if (await userManager.FindByEmailAsync(adminEmail) is not null)
+        var admin = await userManager.FindByEmailAsync(adminEmail);
+        if (admin is null)
         {
-            return;
+            admin = new ApplicationUser
+            {
+                UserName = adminEmail,
+                Email = adminEmail,
+                EmailConfirmed = true,
+                FullName = "Platform Administrator",
+                TenantId = tenantId,
+            };
+
+            var result = await userManager.CreateAsync(admin, adminPassword);
+            if (!result.Succeeded)
+            {
+                var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+                logger.LogError("Failed to create admin user: {Errors}", errors);
+                return;
+            }
+
+            logger.LogInformation("Admin user created: {Email}", adminEmail);
+        }
+        else if (!await userManager.CheckPasswordAsync(admin, adminPassword))
+        {
+            if (await userManager.HasPasswordAsync(admin))
+            {
+                var removePassword = await userManager.RemovePasswordAsync(admin);
+                if (!removePassword.Succeeded)
+                {
+                    var errors = string.Join("; ", removePassword.Errors.Select(e => e.Description));
+                    logger.LogError("Failed to remove existing admin password: {Errors}", errors);
+                    return;
+                }
+            }
+
+            var addPassword = await userManager.AddPasswordAsync(admin, adminPassword);
+            if (!addPassword.Succeeded)
+            {
+                var errors = string.Join("; ", addPassword.Errors.Select(e => e.Description));
+                logger.LogError("Failed to update admin password: {Errors}", errors);
+                return;
+            }
+
+            logger.LogInformation("Admin user password synchronized: {Email}", adminEmail);
         }
 
-        var admin = new ApplicationUser
+        if (!await userManager.IsInRoleAsync(admin, Roles.SuperAdmin))
         {
-            UserName = adminEmail,
-            Email = adminEmail,
-            EmailConfirmed = true,
-            FullName = "Platform Administrator",
-            TenantId = tenantId,
-        };
-
-        var result = await userManager.CreateAsync(admin, adminPassword);
-        if (!result.Succeeded)
-        {
-            var errors = string.Join("; ", result.Errors.Select(e => e.Description));
-            logger.LogError("Failed to create admin user: {Errors}", errors);
-            return;
+            await userManager.AddToRoleAsync(admin, Roles.SuperAdmin);
         }
 
-        await userManager.AddToRoleAsync(admin, Roles.SuperAdmin);
-
-        // Log only that the admin was created, NEVER the password.
-        logger.LogInformation("Admin user created: {Email}", adminEmail);
+        // Log only the email, NEVER the password.
     }
 
     private static async Task SeedSampleInventoryAsync(StayFlowDbContext context, Guid tenantId, CancellationToken cancellationToken)

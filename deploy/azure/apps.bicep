@@ -7,27 +7,24 @@ param location string = resourceGroup().location
 @description('Azure Container Registry name created by main.bicep.')
 param acrName string
 
-@description('Azure Container Apps managed environment name created by main.bicep.')
+@description('Azure Container Apps managed environment name.')
 param containerEnvName string
+
+@description('Azure Container Apps managed environment resource group.')
+param containerEnvResourceGroup string = 'rg-app-container'
 
 @description('User-assigned managed identity name with AcrPull rights.')
 param identityName string
 
-@description('PostgreSQL Flexible Server name created by main.bicep.')
-param postgresServerName string
-
-@description('PostgreSQL administrator login.')
-param postgresAdminLogin string = 'stayflowadmin'
-
 @secure()
-@description('PostgreSQL administrator password. Store this as a GitHub Actions secret.')
-param postgresAdminPassword string
-
-@description('PostgreSQL database name.')
-param postgresDatabaseName string = 'stayflow'
+@description('Neon PostgreSQL connection string.')
+param neonConnectionString string
 
 @description('Container image for the ASP.NET Core API.')
 param apiImage string
+
+@description('Container image for the database migration/seed job.')
+param migrationImage string
 
 @description('Container image for the Next.js frontend.')
 param webImage string
@@ -48,10 +45,22 @@ param minReplicas int = 0
 @description('Maximum replicas per Container App.')
 param maxReplicas int = 2
 
+@secure()
+@description('Initial platform administrator email used by the idempotent data seeder.')
+param adminEmail string
+
+@secure()
+@description('Initial platform administrator password used by the idempotent data seeder.')
+param adminPassword string
+
+@secure()
+@description('Confidential client secret used for service-to-service OAuth clients seeded in production.')
+param serviceClientSecret string
+
 var normalizedName = toLower(replace(environmentName, '_', '-'))
 var apiAppName = '${normalizedName}-api'
 var webAppName = '${normalizedName}-web'
-var postgresConnectionString = 'Host=${postgres.properties.fullyQualifiedDomainName};Port=5432;Database=${postgresDatabaseName};Username=${postgresAdminLogin};Password=${postgresAdminPassword};Ssl Mode=Require;Trust Server Certificate=true'
+var postgresConnectionString = neonConnectionString
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
@@ -59,15 +68,13 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
 
 resource containerEnv 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: containerEnvName
+  scope: resourceGroup(containerEnvResourceGroup)
 }
 
 resource pullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: identityName
 }
 
-resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview' existing = {
-  name: postgresServerName
-}
 
 resource api 'Microsoft.App/containerApps@2024-03-01' = {
   name: apiAppName
@@ -116,6 +123,14 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
               value: 'http://+:8080'
             }
             {
+              name: 'Authentication__FrontendLoginUrl'
+              value: '${siteUrl}/signin'
+            }
+            {
+              name: 'Authentication__Issuer'
+              value: oidcAuthority
+            }
+            {
               name: 'ConnectionStrings__Default'
               secretRef: 'postgres-connection-string'
             }
@@ -158,6 +173,106 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
         minReplicas: minReplicas
         maxReplicas: maxReplicas
       }
+    }
+  }
+}
+
+resource migrationJob 'Microsoft.App/jobs@2024-03-01' = {
+  name: '${normalizedName}-migrations'
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${pullIdentity.id}': {}
+    }
+  }
+  properties: {
+    environmentId: containerEnv.id
+    configuration: {
+      triggerType: 'Manual'
+      replicaTimeout: 1800
+      replicaRetryLimit: 1
+      manualTriggerConfig: {
+        parallelism: 1
+        replicaCompletionCount: 1
+      }
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: pullIdentity.id
+        }
+      ]
+      secrets: [
+        {
+          name: 'postgres-connection-string'
+          value: postgresConnectionString
+        }
+        {
+          name: 'seed-admin-email'
+          value: adminEmail
+        }
+        {
+          name: 'seed-admin-password'
+          value: adminPassword
+        }
+        {
+          name: 'service-client-secret'
+          value: serviceClientSecret
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'migrations'
+          image: migrationImage
+          command: [
+            '/bin/sh'
+            '-c'
+          ]
+          args: [
+            'dotnet StayFlow.MigrationHost.dll migrate && dotnet StayFlow.MigrationHost.dll seed'
+          ]
+          env: [
+            {
+              name: 'ASPNETCORE_ENVIRONMENT'
+              value: 'Production'
+            }
+            {
+              name: 'ConnectionStrings__Default'
+              secretRef: 'postgres-connection-string'
+            }
+            {
+              name: 'Seeding__AdminEmail'
+              secretRef: 'seed-admin-email'
+            }
+            {
+              name: 'Seeding__AdminPassword'
+              secretRef: 'seed-admin-password'
+            }
+            {
+              name: 'Authentication__ServiceClientSecret'
+              secretRef: 'service-client-secret'
+            }
+            {
+              name: 'Authentication__Issuer'
+              value: oidcAuthority
+            }
+            {
+              name: 'Authentication__SpaRedirectUris__0'
+              value: '${siteUrl}/api/auth/callback'
+            }
+            {
+              name: 'Authentication__SpaPostLogoutRedirectUris__0'
+              value: '${siteUrl}/'
+            }
+          ]
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+        }
+      ]
     }
   }
 }

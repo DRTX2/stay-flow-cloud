@@ -8,15 +8,15 @@ on:
       resource_group:
         description: Azure resource group
         required: false
-        default: rg-stayflow-dev
+        default: stayflow-rg-south
       location:
-        description: Azure region
+        description: Azure infrastructure region
         required: false
-        default: eastus
+        default: southcentralus
       environment_name:
         description: Short environment name
         required: false
-        default: stayflow-dev
+        default: stayflow-prod
 
 # ── Permissions ────────────────────────────────────────────────────────────────
 # contents:read      — checkout
@@ -33,9 +33,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  RESOURCE_GROUP: ${{ inputs.resource_group || vars.AZURE_RESOURCE_GROUP || 'rg-stayflow-dev' }}
-  LOCATION: ${{ inputs.location || vars.AZURE_LOCATION || 'eastus' }}
-  ENVIRONMENT_NAME: ${{ inputs.environment_name || vars.AZURE_ENVIRONMENT_NAME || 'stayflow-dev' }}
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
@@ -47,14 +44,14 @@ jobs:
     name: Provision Infrastructure
     runs-on: ubuntu-latest
     environment: production
+    env:
+      RESOURCE_GROUP: ${{ inputs.resource_group || vars.AZURE_RESOURCE_GROUP || 'stayflow-rg-south' }}
+      INFRA_LOCATION: ${{ inputs.location || vars.AZURE_INFRA_LOCATION || 'southcentralus' }}
+      ENVIRONMENT_NAME: ${{ inputs.environment_name || vars.AZURE_ENVIRONMENT_NAME || 'stayflow-prod' }}
     outputs:
       acr_name: ${{ steps.infra.outputs.acr_name }}
       acr_login_server: ${{ steps.infra.outputs.acr_login_server }}
-      api_url: ${{ steps.infra.outputs.api_url }}
-      web_url: ${{ steps.infra.outputs.web_url }}
-      container_env_name: ${{ steps.infra.outputs.container_env_name }}
       identity_name: ${{ steps.infra.outputs.identity_name }}
-      postgres_server_name: ${{ steps.infra.outputs.postgres_server_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,7 +66,7 @@ jobs:
       - name: Create resource group
         uses: azure/cli@v2
         with:
-          inlineScript: az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
+          inlineScript: az group create --name "$RESOURCE_GROUP" --location "$INFRA_LOCATION"
 
       - name: Provision infrastructure
         id: infra
@@ -80,16 +77,11 @@ jobs:
               --resource-group "$RESOURCE_GROUP" \
               --template-file deploy/azure/main.bicep \
               --parameters environmentName="$ENVIRONMENT_NAME" \
-              --parameters location="$LOCATION" \
-              --parameters postgresAdminPassword="${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}" \
+              --parameters location="$INFRA_LOCATION" \
               --output json > deployment.json
             echo "acr_name=$(jq -r '.properties.outputs.acrName.value' deployment.json)" >> "$GITHUB_OUTPUT"
             echo "acr_login_server=$(jq -r '.properties.outputs.acrLoginServer.value' deployment.json)" >> "$GITHUB_OUTPUT"
-            echo "api_url=$(jq -r '.properties.outputs.apiUrl.value' deployment.json)" >> "$GITHUB_OUTPUT"
-            echo "container_env_name=$(jq -r '.properties.outputs.containerEnvName.value' deployment.json)" >> "$GITHUB_OUTPUT"
             echo "identity_name=$(jq -r '.properties.outputs.identityName.value' deployment.json)" >> "$GITHUB_OUTPUT"
-            echo "postgres_server_name=$(jq -r '.properties.outputs.postgresServerName.value' deployment.json)" >> "$GITHUB_OUTPUT"
-            echo "web_url=$(jq -r '.properties.outputs.webUrl.value' deployment.json)" >> "$GITHUB_OUTPUT"
 
   # ────────────────────────────────────────────────────────────────────────────
   # JOB 2: Build → Scan → SBOM → Sign → Attest each image.
@@ -101,6 +93,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: provision
     environment: production
+    env:
+      API_URL: ${{ vars.AZURE_API_URL }}
+      WEB_URL: ${{ vars.AZURE_WEB_URL }}
     permissions:
       contents: read
       id-token: write       # Azure OIDC + Cosign keyless signing
@@ -119,8 +114,13 @@ jobs:
             context: frontend
             dockerfile: frontend/Dockerfile
             build_args: |
-              NEXT_PUBLIC_SITE_URL=${{ needs.provision.outputs.web_url }}
-              NEXT_PUBLIC_OIDC_AUTHORITY=${{ needs.provision.outputs.api_url }}
+              NEXT_PUBLIC_SITE_URL=${{ env.WEB_URL }}
+              NEXT_PUBLIC_OIDC_AUTHORITY=${{ env.API_URL }}
+          - name: migrations
+            image: stayflow-migrations
+            context: backend
+            dockerfile: backend/StayFlow.MigrationHost/Dockerfile
+            build_args: ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -227,6 +227,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: [provision, build-sign-attest]
     environment: production
+    env:
+      RESOURCE_GROUP: ${{ inputs.resource_group || vars.AZURE_RESOURCE_GROUP || 'stayflow-rg-south' }}
+      APP_LOCATION: ${{ vars.AZURE_APP_LOCATION || 'westus3' }}
+      ENVIRONMENT_NAME: ${{ inputs.environment_name || vars.AZURE_ENVIRONMENT_NAME || 'stayflow-prod' }}
+      CONTAINER_ENV_NAME: ${{ vars.AZURE_CONTAINER_ENV_NAME }}
+      CONTAINER_ENV_RESOURCE_GROUP: ${{ vars.AZURE_CONTAINER_ENV_RESOURCE_GROUP || 'rg-app-container' }}
+      API_URL: ${{ vars.AZURE_API_URL }}
+      WEB_URL: ${{ vars.AZURE_WEB_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -246,17 +254,30 @@ jobs:
               --resource-group "$RESOURCE_GROUP" \
               --template-file deploy/azure/apps.bicep \
               --parameters environmentName="$ENVIRONMENT_NAME" \
-              --parameters location="$LOCATION" \
+              --parameters location="$APP_LOCATION" \
               --parameters acrName="${{ needs.provision.outputs.acr_name }}" \
-              --parameters containerEnvName="${{ needs.provision.outputs.container_env_name }}" \
+              --parameters containerEnvName="$CONTAINER_ENV_NAME" \
+              --parameters containerEnvResourceGroup="$CONTAINER_ENV_RESOURCE_GROUP" \
               --parameters identityName="${{ needs.provision.outputs.identity_name }}" \
-              --parameters postgresServerName="${{ needs.provision.outputs.postgres_server_name }}" \
-              --parameters postgresAdminPassword="${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}" \
+              --parameters neonConnectionString="${{ secrets.NEON_CONNECTION_STRING }}" \
               --parameters apiImage="${{ needs.provision.outputs.acr_login_server }}/stayflow-api:${{ env.IMAGE_TAG }}" \
+              --parameters migrationImage="${{ needs.provision.outputs.acr_login_server }}/stayflow-migrations:${{ env.IMAGE_TAG }}" \
               --parameters webImage="${{ needs.provision.outputs.acr_login_server }}/stayflow-web:${{ env.IMAGE_TAG }}" \
-              --parameters siteUrl="${{ needs.provision.outputs.web_url }}" \
-              --parameters oidcAuthority="${{ needs.provision.outputs.api_url }}" \
+              --parameters siteUrl="$WEB_URL" \
+              --parameters oidcAuthority="$API_URL" \
+              --parameters adminEmail="${{ secrets.STAYFLOW_ADMIN_EMAIL }}" \
+              --parameters adminPassword="${{ secrets.STAYFLOW_ADMIN_PASSWORD }}" \
+              --parameters serviceClientSecret="${{ secrets.STAYFLOW_SERVICE_CLIENT_SECRET }}" \
               --parameters minReplicas=0
+
+      - name: Run migrations and seed
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az containerapp job start \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$ENVIRONMENT_NAME-migrations" \
+              --wait
 
       - name: Deployment summary
         run: |
@@ -264,7 +285,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| | URL |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 🌐 Web | ${{ needs.provision.outputs.web_url }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 🔌 API | ${{ needs.provision.outputs.api_url }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 🌐 Web | $WEB_URL |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 🔌 API | $API_URL |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Security gates: Trivy ✅ | SBOM ✅ | SLSA Provenance ✅" >> "$GITHUB_STEP_SUMMARY"

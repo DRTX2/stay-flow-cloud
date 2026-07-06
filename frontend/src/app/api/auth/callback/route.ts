@@ -4,7 +4,7 @@ import { SESSION, writeTokenCookies } from "@/server/auth/cookies";
 import { serverConfig } from "@/server/config";
 
 function loginWithError(request: NextRequest, reason: string) {
-  const url = new URL("/login", request.url);
+  const url = new URL("/login", serverConfig.siteUrl);
   url.searchParams.set("error", reason);
   return NextResponse.redirect(url);
 }

@@ -128,10 +128,7 @@ public static class DependencyInjection
 
                 // Local development is served over plain HTTP; allow the token endpoint to accept it.
                 // Production terminates TLS (at the edge or Kestrel) so this stays on by default there.
-                if (isDevelopment)
-                {
-                    aspNetCore.DisableTransportSecurityRequirement();
-                }
+                aspNetCore.DisableTransportSecurityRequirement();
             })
             .AddValidation(options =>
             {

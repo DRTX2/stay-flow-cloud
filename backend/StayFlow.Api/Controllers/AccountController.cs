@@ -41,10 +41,8 @@ public sealed class AccountController(
 
         if (!result.Succeeded)
         {
-            // Redirect back to the frontend login page with an error query parameter.
-            var frontendLogin = $"{Request.Scheme}://{Request.Headers["Origin"].FirstOrDefault()?.TrimEnd('/')}";
-            // Fallback: use a relative redirect so it works even without the Origin header.
-            var loginFallback = "http://localhost:3000/signin";
+            var config = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var loginFallback = config["Authentication:FrontendLoginUrl"] ?? "http://localhost:3000/signin";
             var redirect = $"{loginFallback}?error=invalid_credentials&ReturnUrl={Uri.EscapeDataString(returnUrl ?? "/")}";
             return Redirect(redirect);
         }
