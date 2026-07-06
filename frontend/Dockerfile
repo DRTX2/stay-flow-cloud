@@ -27,7 +27,9 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Non-root user.
-RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+    && addgroup -g 1001 -S nodejs \
+    && adduser -S nextjs -u 1001
 
 COPY --from=build /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
