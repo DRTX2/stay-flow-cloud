@@ -159,7 +159,7 @@ public static class DependencyInjection
             options.LogoutPath = "/account/logout";
             options.Cookie.Name = "StayFlow.Identity";
             options.Cookie.HttpOnly = true;
-            options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.None;
+            options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
             options.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest;
             options.ExpireTimeSpan = TimeSpan.FromHours(1);
             options.Events.OnRedirectToLogin = context =>
