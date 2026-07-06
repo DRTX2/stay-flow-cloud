@@ -54,23 +54,23 @@ jobs:
       identity_name: ${{ steps.infra.outputs.identity_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Azure login
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Create resource group
-        uses: azure/cli@v2
+        uses: azure/cli@v3
         with:
           inlineScript: az group create --name "$RESOURCE_GROUP" --location "$INFRA_LOCATION"
 
       - name: Provision infrastructure
         id: infra
-        uses: azure/cli@v2
+        uses: azure/cli@v3
         with:
           inlineScript: |
             az deployment group create \
@@ -118,24 +118,24 @@ jobs:
             dockerfile: backend/StayFlow.MigrationHost/Dockerfile
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Azure login
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # ── STEP 1: Build ───────────────────────────────────────────────────────
       # Build first into the local daemon (load:true) for scanning.
       # We do NOT push yet — the image must pass the security gate first.
       - name: Build image (local, pre-scan)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
@@ -174,7 +174,7 @@ jobs:
           exit-code: '0'
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ matrix.name }}
           path: sbom-${{ matrix.name }}.cdx.json
@@ -192,7 +192,7 @@ jobs:
 
       - name: Push image to ACR
         id: push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
@@ -210,7 +210,7 @@ jobs:
       # Consumers can verify the attestation with: cosign verify-attestation ...
       - name: Attest build provenance
         if: github.event.repository.private == false
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ needs.provision.outputs.acr_login_server }}/${{ matrix.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -237,17 +237,17 @@ jobs:
       WEB_URL: ${{ vars.AZURE_WEB_URL }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Azure login
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy immutable images
-        uses: azure/cli@v2
+        uses: azure/cli@v3
         with:
           inlineScript: |
             az deployment group create \
@@ -271,7 +271,7 @@ jobs:
               --parameters minReplicas=0
 
       - name: Run migrations and seed
-        uses: azure/cli@v2
+        uses: azure/cli@v3
         with:
           inlineScript: |
             execution_name=$(az containerapp job start \
