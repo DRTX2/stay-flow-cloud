@@ -13,6 +13,20 @@ const CLOCK_SKEW_SECONDS = 30;
  * Doing the refresh here means server components downstream can simply read the cookie.
  */
 export async function proxy(request: NextRequest) {
+  const host = request.headers.get("host");
+
+  // Prevent state_mismatch OAuth error by forcing localhost
+  if (host && (host.startsWith("0.0.0.0") || host.startsWith("127.0.0.1"))) {
+    const newUrl = new URL(request.url);
+    newUrl.hostname = "localhost";
+    return NextResponse.redirect(newUrl);
+  }
+
+  // Only gatekeep /dashboard routes
+  if (!request.nextUrl.pathname.startsWith("/dashboard")) {
+    return NextResponse.next();
+  }
+
   const access = request.cookies.get(SESSION.access)?.value;
   const refresh = request.cookies.get(SESSION.refresh)?.value;
   const expiryRaw = request.cookies.get(SESSION.expiry)?.value;
@@ -43,5 +57,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard", "/dashboard/:path*"],
+  matcher: ["/", "/login", "/signin", "/dashboard", "/dashboard/:path*"],
 };
