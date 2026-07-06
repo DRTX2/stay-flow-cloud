@@ -55,14 +55,16 @@ public static class DependencyInjection
             .AddSignInManager()
             .AddDefaultTokenProviders();
 
-        AddOpenIddict(services, isDevelopment);
+        AddOpenIddict(services, configuration, isDevelopment);
         AddAuthenticationAndAuthorization(services, configuration);
 
         return services;
     }
 
-    private static void AddOpenIddict(IServiceCollection services, bool isDevelopment)
+    private static void AddOpenIddict(IServiceCollection services, IConfiguration? configuration, bool isDevelopment)
     {
+        var issuer = configuration?["Authentication:Issuer"] ?? "http://localhost:8080/";
+
         services.AddOpenIddict()
             .AddCore(options =>
             {
@@ -71,6 +73,8 @@ public static class DependencyInjection
             })
             .AddServer(options =>
             {
+                options.SetIssuer(new Uri(issuer));
+
                 options.SetTokenEndpointUris("connect/token")
                     .SetAuthorizationEndpointUris("connect/authorize")
                     .SetEndSessionEndpointUris("connect/logout")
