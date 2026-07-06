@@ -108,19 +108,14 @@ jobs:
             image: stayflow-api
             context: backend
             dockerfile: backend/StayFlow.Api/Dockerfile
-            build_args: ''
           - name: web
             image: stayflow-web
             context: frontend
             dockerfile: frontend/Dockerfile
-            build_args: |
-              NEXT_PUBLIC_SITE_URL=${{ env.WEB_URL }}
-              NEXT_PUBLIC_OIDC_AUTHORITY=${{ env.API_URL }}
           - name: migrations
             image: stayflow-migrations
             context: backend
             dockerfile: backend/StayFlow.MigrationHost/Dockerfile
-            build_args: ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -147,7 +142,9 @@ jobs:
           load: true
           push: false
           tags: ${{ matrix.image }}:${{ env.IMAGE_TAG }}
-          build-args: ${{ matrix.build_args }}
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=${{ vars.AZURE_WEB_URL }}
+            NEXT_PUBLIC_OIDC_AUTHORITY=${{ vars.AZURE_API_URL }}
           cache-from: type=gha,scope=azure-${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=azure-${{ matrix.name }}
 
@@ -201,7 +198,9 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ needs.provision.outputs.acr_login_server }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
-          build-args: ${{ matrix.build_args }}
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=${{ vars.AZURE_WEB_URL }}
+            NEXT_PUBLIC_OIDC_AUTHORITY=${{ vars.AZURE_API_URL }}
           # Reuse the cached layers — no rebuild needed.
           cache-from: type=gha,scope=azure-${{ matrix.name }}
 
