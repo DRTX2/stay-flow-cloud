@@ -209,6 +209,7 @@ jobs:
       # This proves: who built it, when, from which commit, with which workflow.
       # Consumers can verify the attestation with: cosign verify-attestation ...
       - name: Attest build provenance
+        if: github.event.repository.private == false
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ needs.provision.outputs.acr_login_server }}/${{ matrix.image }}
@@ -287,4 +288,4 @@ jobs:
           echo "| 🌐 Web | $WEB_URL |" >> "$GITHUB_STEP_SUMMARY"
           echo "| 🔌 API | $API_URL |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Security gates: Trivy ✅ | SBOM ✅ | SLSA Provenance ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "Security gates: Trivy ✅ | SBOM ✅ | SLSA provenance skipped for private user repo" >> "$GITHUB_STEP_SUMMARY"
