@@ -51,7 +51,11 @@ export async function exchangeCode(code: string, verifier: string): Promise<Toke
     }),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`Token exchange failed (${res.status}).`);
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    console.error(`Token exchange failed (${res.status}): ${errorText}`);
+    throw new Error(`Token exchange failed (${res.status}).`);
+  }
   return toTokenSet(await res.json());
 }
 

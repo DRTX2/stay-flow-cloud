@@ -20,7 +20,9 @@ export default async function LoginPage({
 }) {
   const { error, redirect } = await searchParams;
   const message = error
-    ? (ERROR_MESSAGES[error] ?? "Something went wrong during sign-in.")
+    ? error.startsWith("exchange_failed_")
+      ? `Exchange failed: ${error.replace("exchange_failed_", "").replace(/_/g, " ")}`
+      : (ERROR_MESSAGES[error] ?? "Something went wrong during sign-in.")
     : null;
   const loginHref = redirect
     ? `/api/auth/login?redirect=${encodeURIComponent(redirect)}`

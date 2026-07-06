@@ -41,7 +41,10 @@ export async function GET(request: NextRequest) {
     response.cookies.delete(SESSION.state);
     response.cookies.delete(SESSION.returnTo);
     return response;
-  } catch {
-    return loginWithError(request, "exchange_failed");
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // URL-safe error message snippet to help debug
+    const safeMsg = msg.replace(/[^a-zA-Z0-9 _-]/g, "").substring(0, 50);
+    return loginWithError(request, "exchange_failed_" + safeMsg.replace(/\s+/g, "_"));
   }
 }
