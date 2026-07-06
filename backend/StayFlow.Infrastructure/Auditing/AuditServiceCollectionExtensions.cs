@@ -17,6 +17,16 @@ public static class AuditServiceCollectionExtensions
     {
         if (!string.IsNullOrWhiteSpace(mongoConnectionString))
         {
+            try
+            {
+                MongoDB.Bson.Serialization.BsonSerializer.RegisterSerializer(
+                    new MongoDB.Bson.Serialization.Serializers.GuidSerializer(MongoDB.Bson.GuidRepresentation.Standard));
+            }
+            catch (MongoDB.Bson.BsonSerializationException)
+            {
+                // Already registered
+            }
+
             var client = new MongoClient(mongoConnectionString);
             services.AddSingleton(client.GetDatabase(databaseName));
             services.AddSingleton<IAuditStore, MongoAuditStore>();

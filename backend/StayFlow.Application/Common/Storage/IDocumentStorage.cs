@@ -17,4 +17,9 @@ public interface IDocumentStorage
 
     /// <summary>A time-limited URL for direct download (S3 pre-signed URL; file URI locally).</summary>
     Task<Uri> GetDownloadUrlAsync(string key, TimeSpan expiresIn, CancellationToken cancellationToken = default);
+
+    /// <summary>Lists all documents stored under the specified prefix.</summary>
+    Task<IEnumerable<DocumentMetadata>> ListAsync(string prefix, CancellationToken cancellationToken = default);
 }
+
+public sealed record DocumentMetadata(string Key, string Name, long Size, string ContentType, DateTimeOffset UploadedOn);

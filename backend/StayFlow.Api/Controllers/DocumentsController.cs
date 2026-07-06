@@ -13,6 +13,21 @@ namespace StayFlow.Api.Controllers;
 [Authorize]
 public sealed class DocumentsController(IDocumentStorage storage, ITenantProvider tenantProvider) : ApiControllerBase
 {
+    [HttpGet]
+    [Authorize(Policy = Permissions.BillingRead)]
+    public async Task<ActionResult<IEnumerable<DocumentMetadata>>> List(CancellationToken cancellationToken)
+    {
+        var tenantId = tenantProvider.TenantId;
+        if (tenantId is null)
+        {
+            return BadRequest("Tenant ID is missing.");
+        }
+
+        var prefix = $"{tenantId}";
+        var documents = await storage.ListAsync(prefix, cancellationToken);
+        return Ok(documents);
+    }
+
     [HttpPost]
     [Authorize(Policy = Permissions.BillingManage)]
     [RequestSizeLimit(25 * 1024 * 1024)]

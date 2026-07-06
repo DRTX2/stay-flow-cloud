@@ -49,6 +49,42 @@ public sealed class LocalFileDocumentStorage : IDocumentStorage
     public Task<Uri> GetDownloadUrlAsync(string key, TimeSpan expiresIn, CancellationToken cancellationToken = default)
         => Task.FromResult(new Uri(Path.GetFullPath(PathFor(key))));
 
+    public async Task<IEnumerable<DocumentMetadata>> ListAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        var tenantDir = Path.Combine(_root, prefix);
+        if (!Directory.Exists(tenantDir))
+        {
+            return Enumerable.Empty<DocumentMetadata>();
+        }
+
+        var files = Directory.GetFiles(tenantDir);
+        var result = new List<DocumentMetadata>();
+
+        foreach (var file in files)
+        {
+            if (file.EndsWith(".contenttype", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var key = prefix + "/" + Path.GetFileName(file);
+            var fileInfo = new FileInfo(file);
+            var contentType = File.Exists(file + ".contenttype")
+                ? await File.ReadAllTextAsync(file + ".contenttype", cancellationToken)
+                : "application/octet-stream";
+
+            result.Add(new DocumentMetadata(
+                Key: key,
+                Name: Path.GetFileName(file),
+                Size: fileInfo.Length,
+                ContentType: contentType,
+                UploadedOn: fileInfo.LastWriteTimeUtc
+            ));
+        }
+
+        return result;
+    }
+
     // Map a storage key onto a path under the root, guarding against traversal outside it.
     private string PathFor(string key)
     {

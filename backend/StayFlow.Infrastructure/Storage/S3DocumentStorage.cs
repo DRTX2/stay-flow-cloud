@@ -52,4 +52,47 @@ public sealed class S3DocumentStorage(IAmazonS3 client, string bucketName) : IDo
 
         return new Uri(url);
     }
+
+    public async Task<IEnumerable<DocumentMetadata>> ListAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        var request = new ListObjectsV2Request
+        {
+            BucketName = bucketName,
+            Prefix = prefix
+        };
+
+        var response = await client.ListObjectsV2Async(request, cancellationToken);
+        var result = new List<DocumentMetadata>();
+
+        foreach (var s3Object in response.S3Objects)
+        {
+            var key = s3Object.Key;
+            var name = key.Substring(prefix.Length).TrimStart('/');
+            
+            // Skip directory markers if any
+            if (string.IsNullOrEmpty(name))
+            {
+                continue;
+            }
+
+            var size = s3Object.Size;
+            var uploadedOn = s3Object.LastModified;
+
+            var extension = Path.GetExtension(name).ToLowerInvariant();
+            var contentType = extension switch
+            {
+                ".pdf" => "application/pdf",
+                ".csv" => "text/csv",
+                ".txt" => "text/plain",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".json" => "application/json",
+                _ => "application/octet-stream"
+            };
+
+            result.Add(new DocumentMetadata(key, name, size ?? 0, contentType, uploadedOn ?? DateTime.UtcNow));
+        }
+
+        return result;
+    }
 }
