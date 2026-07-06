@@ -45,9 +45,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      RESOURCE_GROUP: ${{ inputs.resource_group || vars.AZURE_RESOURCE_GROUP || 'stayflow-rg-south' }}
-      INFRA_LOCATION: ${{ inputs.location || vars.AZURE_INFRA_LOCATION || 'southcentralus' }}
-      ENVIRONMENT_NAME: ${{ inputs.environment_name || vars.AZURE_ENVIRONMENT_NAME || 'stayflow-prod' }}
+      RESOURCE_GROUP: ${{ github.event.inputs.resource_group || vars.AZURE_RESOURCE_GROUP || 'stayflow-rg-south' }}
+      INFRA_LOCATION: ${{ github.event.inputs.location || vars.AZURE_INFRA_LOCATION || 'southcentralus' }}
+      ENVIRONMENT_NAME: ${{ github.event.inputs.environment_name || vars.AZURE_ENVIRONMENT_NAME || 'stayflow-prod' }}
     outputs:
       acr_name: ${{ steps.infra.outputs.acr_name }}
       acr_login_server: ${{ steps.infra.outputs.acr_login_server }}
@@ -228,9 +228,9 @@ jobs:
     needs: [provision, build-sign-attest]
     environment: production
     env:
-      RESOURCE_GROUP: ${{ inputs.resource_group || vars.AZURE_RESOURCE_GROUP || 'stayflow-rg-south' }}
+      RESOURCE_GROUP: ${{ github.event.inputs.resource_group || vars.AZURE_RESOURCE_GROUP || 'stayflow-rg-south' }}
       APP_LOCATION: ${{ vars.AZURE_APP_LOCATION || 'westus3' }}
-      ENVIRONMENT_NAME: ${{ inputs.environment_name || vars.AZURE_ENVIRONMENT_NAME || 'stayflow-prod' }}
+      ENVIRONMENT_NAME: ${{ github.event.inputs.environment_name || vars.AZURE_ENVIRONMENT_NAME || 'stayflow-prod' }}
       CONTAINER_ENV_NAME: ${{ vars.AZURE_CONTAINER_ENV_NAME }}
       CONTAINER_ENV_RESOURCE_GROUP: ${{ vars.AZURE_CONTAINER_ENV_RESOURCE_GROUP || 'rg-app-container' }}
       API_URL: ${{ vars.AZURE_API_URL }}
