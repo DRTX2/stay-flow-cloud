@@ -34,6 +34,17 @@ builder.Services.AddMessaging(builder.Configuration);
 builder.Services.AddBackgroundJobs(connectionString);
 builder.Services.AddDocumentStorage(builder.Configuration);
 
+// CORS: allow the Next.js frontend to POST credentials cross-origin to /account/login.
+// The Identity application cookie is SameSite=None so it round-trips through the
+// frontend → backend → frontend redirect chain correctly.
+var frontendOrigin = builder.Configuration["FrontendOrigin"] ?? "http://localhost:3000";
+builder.Services.AddCors(options =>
+    options.AddPolicy("frontend", policy => policy
+        .WithOrigins(frontendOrigin)
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials()));
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -117,6 +128,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseCors("frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 

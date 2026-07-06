@@ -18,6 +18,12 @@ namespace StayFlow.Infrastructure;
 
 public static class DependencyInjection
 {
+    /// <summary>
+    /// Configuration key for the frontend URL that hosts the interactive login form.
+    /// The Identity cookie challenge redirects here so the backend never serves frontend HTML.
+    /// </summary>
+    public const string FrontendLoginUrlKey = "Authentication:FrontendLoginUrl";
+
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         bool isDevelopment = false,
@@ -140,16 +146,32 @@ public static class DependencyInjection
             options.DefaultScheme = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
         });
 
+        // The interactive login form lives in the Next.js frontend (not the API).
+        // The cookie challenge redirects there; the frontend page POSTs credentials
+        // back to the API's /account/login endpoint.
+        var frontendLoginUrl = configuration?[FrontendLoginUrlKey]
+            ?? "http://localhost:3000/auth/signin";
+
         authentication.AddCookie(IdentityConstants.ApplicationScheme, options =>
         {
-            options.LoginPath = "/account/login";
+            options.LoginPath = frontendLoginUrl;
             options.LogoutPath = "/account/logout";
             options.Cookie.Name = "StayFlow.Identity";
             options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.None;
+            options.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest;
             options.ExpireTimeSpan = TimeSpan.FromHours(1);
             options.Events.OnRedirectToLogin = context =>
             {
-                context.Response.Redirect(context.RedirectUri);
+                // Build the redirect to the frontend login page, passing along the
+                // original backend ReturnUrl so the form can POST it back.
+                var returnUrl = context.Properties.RedirectUri ?? "/";
+                var loginUrl = new Uri(frontendLoginUrl);
+                var destination = new UriBuilder(loginUrl);
+                var query = System.Web.HttpUtility.ParseQueryString(loginUrl.Query);
+                query["ReturnUrl"] = returnUrl;
+                destination.Query = query.ToString();
+                context.Response.Redirect(destination.ToString());
                 return Task.CompletedTask;
             };
             options.Events.OnRedirectToAccessDenied = context =>
