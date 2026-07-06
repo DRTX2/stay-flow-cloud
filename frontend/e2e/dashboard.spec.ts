@@ -5,11 +5,18 @@ test.beforeEach(async ({ page }) => {
   await loginAs(page);
 });
 
-test("dashboard shows KPI cards and a revenue chart", async ({ page }) => {
+test("dashboard shows current KPI cards and a revenue chart", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
-  for (const kpi of ["Revenue (30d)", "Occupancy", "ADR", "RevPAR"]) {
+  for (const kpi of [
+    "Revenue (30d)",
+    "Occupancy",
+    "Arrivals",
+    "Departures",
+    "In house",
+    "Ops backlog",
+  ]) {
     await expect(page.getByText(kpi, { exact: false }).first()).toBeVisible();
   }
 
