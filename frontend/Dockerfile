@@ -2,13 +2,13 @@
 # Multi-stage build for the Next.js BFF using the standalone output.
 
 # --- Dependencies ----------------------------------------------------------
-FROM node:24-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
 # --- Build -----------------------------------------------------------------
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -21,7 +21,7 @@ ENV NEXT_PUBLIC_OIDC_AUTHORITY=$NEXT_PUBLIC_OIDC_AUTHORITY
 RUN npm run build
 
 # --- Runtime ---------------------------------------------------------------
-FROM node:24-alpine AS final
+FROM node:26-alpine AS final
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
