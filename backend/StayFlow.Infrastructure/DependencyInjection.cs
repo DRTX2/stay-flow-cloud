@@ -154,7 +154,8 @@ public static class DependencyInjection
 
         authentication.AddCookie(IdentityConstants.ApplicationScheme, options =>
         {
-            options.LoginPath = frontendLoginUrl;
+            // LoginPath must be relative (PathString). We intercept the redirect below.
+            options.LoginPath = "/account/login";
             options.LogoutPath = "/account/logout";
             options.Cookie.Name = "StayFlow.Identity";
             options.Cookie.HttpOnly = true;
@@ -163,8 +164,7 @@ public static class DependencyInjection
             options.ExpireTimeSpan = TimeSpan.FromHours(1);
             options.Events.OnRedirectToLogin = context =>
             {
-                // Build the redirect to the frontend login page, passing along the
-                // original backend ReturnUrl so the form can POST it back.
+                // Override the default redirect to point to the Next.js frontend
                 var returnUrl = context.Properties.RedirectUri ?? "/";
                 var loginUrl = new Uri(frontendLoginUrl);
                 var destination = new UriBuilder(loginUrl);
