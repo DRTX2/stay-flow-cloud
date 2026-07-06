@@ -150,7 +150,7 @@ public static class DependencyInjection
         // The cookie challenge redirects there; the frontend page POSTs credentials
         // back to the API's /account/login endpoint.
         var frontendLoginUrl = configuration?[FrontendLoginUrlKey]
-            ?? "http://localhost:3000/auth/signin";
+            ?? "http://localhost:3000/signin";
 
         authentication.AddCookie(IdentityConstants.ApplicationScheme, options =>
         {
