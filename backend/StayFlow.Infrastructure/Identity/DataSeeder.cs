@@ -159,7 +159,8 @@ public sealed class DataSeeder(
             }
         }
 
-        if (await manager.FindByClientIdAsync(AuthConstants.Clients.Service, cancellationToken) is null)
+        var serviceApplication = await manager.FindByClientIdAsync(AuthConstants.Clients.Service, cancellationToken);
+        if (serviceApplication is null)
         {
             // Secret must come from configuration (environment variable / secrets manager).
             // In development without the key set, a fallback is used and a warning is emitted.
@@ -189,6 +190,25 @@ public sealed class DataSeeder(
                     OpenIddictConstants.Permissions.Prefixes.Scope + AuthConstants.ApiScope,
                 },
             }, cancellationToken);
+        }
+        else
+        {
+            var serviceSecret = configuration[ServiceClientSecretKey];
+            if (string.IsNullOrWhiteSpace(serviceSecret))
+            {
+                if (!isDev)
+                {
+                    throw new InvalidOperationException(
+                        $"Configuration key '{ServiceClientSecretKey}' is required in non-development environments.");
+                }
+
+                serviceSecret = DevFallbackServiceSecret;
+            }
+
+            var descriptor = new OpenIddictApplicationDescriptor();
+            await manager.PopulateAsync(descriptor, serviceApplication, cancellationToken);
+            descriptor.ClientSecret = serviceSecret;
+            await manager.UpdateAsync(serviceApplication, descriptor, cancellationToken);
         }
 
         if (isDev && await manager.FindByClientIdAsync(AuthConstants.Clients.TestAdmin, cancellationToken) is null)
