@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
+using Scalar.AspNetCore;
 using Serilog;
 using StayFlow.Api.Middleware;
 using StayFlow.Api.Observability;
@@ -88,7 +89,20 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "StayFlow Cloud API", Version = "v1" });
+    options.SwaggerDoc("v1", new OpenApiInfo 
+    { 
+        Title = "StayFlow Cloud API", 
+        Version = "v1",
+        Description = "StayFlow Cloud Property Management System API"
+    });
+
+    // Include XML Comments
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
 
     // Swagger UI uses Authorization Code + PKCE — the same secure flow as the production SPA.
     // No password grant. No client secret exposed to the browser.
@@ -131,12 +145,12 @@ app.UseSerilogRequestLogging();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(options =>
+    app.MapScalarApiReference(options =>
     {
-        options.OAuthClientId(AuthConstants.Clients.Spa);
-        // Enable PKCE in Swagger UI — required since we removed password grant.
-        options.OAuthUsePkce();
-        options.OAuthScopes(AuthConstants.ApiScope);
+        options.Authentication = new ScalarAuthenticationOptions
+        {
+            PreferredSecuritySchemes = ["oauth2"]
+        };
     });
 }
 
@@ -156,11 +170,33 @@ app.MapControllers();
 app.MapObservability();
 app.UseBackgroundJobs();
 
-if (builder.Configuration.GetValue("Database:RunMigrationsOnStartup", false))
+var runMigrationsOnStartup = builder.Configuration.GetValue("Database:RunMigrationsOnStartup", false);
+var ensureCreatedOnStartup = builder.Configuration.GetValue("Database:EnsureCreatedOnStartup", false);
+
+if (runMigrationsOnStartup && ensureCreatedOnStartup)
+{
+    throw new InvalidOperationException(
+        "Use either Database:RunMigrationsOnStartup or Database:EnsureCreatedOnStartup, not both.");
+}
+
+if (ensureCreatedOnStartup && !app.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "Database:EnsureCreatedOnStartup is only allowed in Development because it bypasses EF migrations.");
+}
+
+if (runMigrationsOnStartup)
 {
     await using var scope = app.Services.CreateAsyncScope();
     var context = scope.ServiceProvider.GetRequiredService<StayFlowDbContext>();
     await context.Database.MigrateAsync();
+    await scope.ServiceProvider.GetRequiredService<DataSeeder>().SeedAsync();
+}
+else if (ensureCreatedOnStartup)
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var context = scope.ServiceProvider.GetRequiredService<StayFlowDbContext>();
+    await context.Database.EnsureCreatedAsync();
     await scope.ServiceProvider.GetRequiredService<DataSeeder>().SeedAsync();
 }
 
@@ -173,6 +209,8 @@ if (builder.Configuration.GetValue("Database:RunMigrationsOnStartup", false))
 // This prevents race conditions in multi-replica deployments and separates the migrator
 // database user (schema-level permissions) from the app user (data-level permissions only).
 // The Database:RunMigrationsOnStartup switch exists only for integration/contract tests.
+// For local throwaway databases, Database:EnsureCreatedOnStartup can create the schema
+// directly from the current EF model without migrations. It does not update existing schemas.
 
 app.Run();
 

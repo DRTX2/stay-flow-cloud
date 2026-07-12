@@ -1,7 +1,15 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Ban, FileText, Check, LogIn, LogOut } from "lucide-react";
+import {
+  MoreHorizontal,
+  Ban,
+  FileText,
+  Check,
+  LogIn,
+  LogOut,
+  MessageSquareText,
+} from "lucide-react";
 import type { Reservation } from "@/types/api";
 import { formatDate, money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -22,6 +30,7 @@ interface Actions {
   onCheckOut: (r: Reservation) => void;
   onCancel: (r: Reservation) => void;
   onInvoice: (r: Reservation) => void;
+  onFeedback: (r: Reservation) => void;
   pending?: boolean;
 }
 
@@ -31,6 +40,7 @@ export function reservationColumns({
   onCheckOut,
   onCancel,
   onInvoice,
+  onFeedback,
   pending,
 }: Actions): ColumnDef<Reservation>[] {
   return [
@@ -114,6 +124,11 @@ export function reservationColumns({
                 <DropdownMenuItem onClick={() => onInvoice(r)}>
                   <FileText className="h-4 w-4" /> Generate invoice
                 </DropdownMenuItem>
+                {status === "checkedout" && (
+                  <DropdownMenuItem onClick={() => onFeedback(r)}>
+                    <MessageSquareText className="h-4 w-4" /> Copy feedback link
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   disabled={terminal}

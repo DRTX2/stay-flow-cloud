@@ -12,6 +12,8 @@ internal sealed class GetOrdersQueryHandler(IApplicationDbContext dbContext) : I
 {
     public async Task<PagedResult<OrderDto>> Handle(GetOrdersQuery request, CancellationToken cancellationToken)
     {
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 100);
         var query = dbContext.Orders
             .Include(o => o.Items)
             .AsNoTracking();
@@ -25,13 +27,13 @@ internal sealed class GetOrdersQueryHandler(IApplicationDbContext dbContext) : I
 
         var items = await query
             .OrderByDescending(o => o.CreatedAtUtc)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(o => new OrderDto(
                 o.Id, o.ReservationId, o.Status.ToString(), o.Notes, o.TotalAmount, o.CreatedAtUtc, o.DeliveredAtUtc,
                 o.Items.Select(i => new OrderLineItemDto(i.ServiceItemId, i.ServiceName, i.Quantity, i.UnitPrice, i.Total)).ToList()))
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<OrderDto>(items, total, request.Page, request.PageSize);
+        return new PagedResult<OrderDto>(items, page, pageSize, total);
     }
 }

@@ -4,6 +4,7 @@ using StayFlow.Application.Common.Abstractions;
 using StayFlow.Application.Common.Exceptions;
 using StayFlow.Domain.Common;
 using StayFlow.Domain.Orders;
+using StayFlow.Domain.Reservations;
 using StayFlow.Domain.Services;
 
 namespace StayFlow.Application.Features.Orders.Commands;
@@ -16,6 +17,19 @@ internal sealed class PlaceOrderCommandHandler(IApplicationDbContext dbContext) 
 {
     public async Task<Guid> Handle(PlaceOrderCommand request, CancellationToken cancellationToken)
     {
+        if (request.Items.Count == 0)
+        {
+            throw new DomainException("Order must contain at least one item.");
+        }
+
+        var reservationIsCheckedIn = await dbContext.Reservations
+            .AnyAsync(reservation => reservation.Id == request.ReservationId
+                && reservation.Status == ReservationStatus.CheckedIn, cancellationToken);
+        if (!reservationIsCheckedIn)
+        {
+            throw new DomainException("Orders can only be placed for checked-in reservations.");
+        }
+
         var order = Order.Create(request.ReservationId, request.Notes);
 
         var serviceItemIds = request.Items.Select(i => i.ServiceItemId).ToList();

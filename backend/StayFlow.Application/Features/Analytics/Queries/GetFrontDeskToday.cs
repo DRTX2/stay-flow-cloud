@@ -2,7 +2,9 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Domain.Housekeeping;
+using StayFlow.Domain.BookingEnquiries;
 using StayFlow.Domain.Maintenance;
+using StayFlow.Domain.Orders;
 using StayFlow.Domain.Reservations;
 using StayFlow.Domain.Rooms;
 
@@ -19,6 +21,8 @@ public sealed record FrontDeskTodayDto(
     int OutOfServiceRooms,
     int PendingHousekeepingTasks,
     int OpenMaintenanceWorkOrders,
+    int PendingBookingEnquiries,
+    int OpenOrders,
     IReadOnlyList<FrontDeskReservationItemDto> ArrivalList,
     IReadOnlyList<FrontDeskReservationItemDto> DepartureList,
     IReadOnlyList<FrontDeskRoomIssueDto> RoomIssues);
@@ -67,7 +71,13 @@ public sealed class GetFrontDeskTodayHandler(IApplicationDbContext dbContext, ID
             .CountAsync(task => task.Status != HousekeepingTaskStatus.Completed, cancellationToken);
 
         var openMaintenance = await dbContext.WorkOrders
-            .CountAsync(workOrder => workOrder.Status == WorkOrderStatus.Open || workOrder.Status == WorkOrderStatus.InProgress, cancellationToken);
+                .CountAsync(workOrder => workOrder.Status == WorkOrderStatus.Open || workOrder.Status == WorkOrderStatus.InProgress, cancellationToken);
+
+        var pendingBookingEnquiries = await dbContext.BookingEnquiries
+            .CountAsync(enquiry => enquiry.Status == BookingEnquiryStatus.Pending, cancellationToken);
+
+        var openOrders = await dbContext.Orders
+            .CountAsync(order => order.Status == OrderStatus.Pending || order.Status == OrderStatus.Preparing, cancellationToken);
 
         var roomIssues = await GetRoomIssues(cancellationToken);
 
@@ -80,6 +90,8 @@ public sealed class GetFrontDeskTodayHandler(IApplicationDbContext dbContext, ID
             outOfServiceRooms,
             pendingHousekeeping,
             openMaintenance,
+            pendingBookingEnquiries,
+            openOrders,
             arrivals,
             departures,
             roomIssues);

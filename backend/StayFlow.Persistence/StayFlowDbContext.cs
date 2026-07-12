@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Domain.Billing;
+using StayFlow.Domain.BookingEnquiries;
+using StayFlow.Domain.Feedback;
 using StayFlow.Domain.Guests;
 using StayFlow.Domain.Housekeeping;
 using StayFlow.Domain.Maintenance;
@@ -34,6 +36,8 @@ public sealed class StayFlowDbContext : IdentityDbContext<ApplicationUser, Appli
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<BookingEnquiry> BookingEnquiries => Set<BookingEnquiry>();
+    public DbSet<ReservationFeedback> ReservationFeedback => Set<ReservationFeedback>();
     public DbSet<RoomType> RoomTypes => Set<RoomType>();
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<Guest> Guests => Set<Guest>();
@@ -54,6 +58,8 @@ public sealed class StayFlowDbContext : IdentityDbContext<ApplicationUser, Appli
 
         // Tenant isolation + soft delete. Tenant itself is not tenant-scoped.
         builder.Entity<RoomType>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<BookingEnquiry>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+        builder.Entity<ReservationFeedback>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
         builder.Entity<Room>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
         builder.Entity<Guest>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
         builder.Entity<Reservation>().HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);

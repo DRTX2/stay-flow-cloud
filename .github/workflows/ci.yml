@@ -95,7 +95,7 @@ jobs:
           NEXT_PUBLIC_OIDC_AUTHORITY: http://localhost:8080
 
   security:
-    name: Dependency and Secret Scan
+    name: Dependency, Secret and IaC Scan
     runs-on: ubuntu-latest
     permissions:
       # Needed only here to upload Trivy SARIF results to the Security tab.
@@ -126,6 +126,16 @@ jobs:
       - name: NPM audit
         run: npm audit --audit-level=high
         working-directory: frontend
+
+      - name: Trivy secret and IaC scan (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
 
       # ── Trivy filesystem scan ──────────────────────────────────────────────
       # exit-code: '1' makes the job FAIL on HIGH or CRITICAL findings, turning
@@ -163,6 +173,32 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-fs.sarif
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [csharp, javascript-typescript]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
 
   e2e:
     name: E2E

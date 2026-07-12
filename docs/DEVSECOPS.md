@@ -7,9 +7,9 @@
 | Validate | .NET restore/build/test, Next.js lint/typecheck/unit/build, Playwright E2E |
 | SCA | NuGet audit, `npm audit`, Dependabot, dependency review |
 | SAST | CodeQL for C# and TypeScript |
-| Secrets/IaC/image scan | Trivy filesystem scan, image scan and IaC review baseline |
-| Package | Immutable Docker images tagged with commit SHA |
-| Deploy | GitHub OIDC to Azure, ACR admin disabled, managed identity AcrPull |
+| Secrets/IaC/image scan | Blocking Trivy secret, misconfiguration, filesystem and image scans |
+| Package | Immutable GHCR Docker images tagged with commit SHA, SBOM artifacts and SLSA provenance |
+| Deploy | GitHub OIDC to Azure, GHCR pull credentials stored as Container Apps secrets |
 
 ## Current Hardening Decisions
 
@@ -25,6 +25,7 @@
 The default Azure deployment is intentionally lean for Azure for Students:
 
 - Azure Container Apps for API and frontend.
+- GitHub Container Registry for images to avoid Azure Container Registry charges.
 - Azure Database for PostgreSQL Flexible Server as the required persistent store.
 - Redis, MongoDB and RabbitMQ are optional in the current code path and can be added later.
 - Log Analytics captures platform logs.
@@ -34,7 +35,7 @@ The default Azure deployment is intentionally lean for Azure for Students:
 - Move PostgreSQL to private networking with Container Apps VNet integration.
 - Add custom domains and managed certificates for API/frontend.
 - Add environment protection rules and required reviewers for `production`.
-- Add SBOM generation and image signing with cosign.
+- Enforce signed provenance verification before deployment.
 - Add DAST against a deployed staging environment.
 - Run `StayFlow.MigrationHost migrate` as an explicit pre-deploy job in the Azure workflow.
 - Split app and migrator database users so only the migrator has DDL permissions.

@@ -1,8 +1,10 @@
 name: Deploy Azure
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
     branches: [main]
+    types: [completed]
   workflow_dispatch:
     inputs:
       resource_group:
@@ -18,40 +20,32 @@ on:
         required: false
         default: stayflow-prod
 
-# ── Permissions ────────────────────────────────────────────────────────────────
-# contents:read      — checkout
-# id-token:write     — OIDC login to Azure (Workload Identity Federation)
-# packages:write     — push to GHCR (used only if ACR is unavailable)
-# attestations:write — github/attest-build-provenance (SLSA provenance)
 permissions:
   contents: read
   id-token: write
   attestations: write
+  packages: write
 
 concurrency:
   group: deploy-azure-${{ github.ref }}
   cancel-in-progress: false
 
 env:
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+  IMAGE_REGISTRY: ghcr.io
 
 jobs:
-  # ────────────────────────────────────────────────────────────────────────────
-  # JOB 1: Provision cloud infrastructure (ACR, Postgres, Container Env).
-  # Separated from the image jobs so infra changes don't re-scan images.
-  # ────────────────────────────────────────────────────────────────────────────
   provision:
     name: Provision Infrastructure
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: production
     env:
       RESOURCE_GROUP: ${{ github.event.inputs.resource_group || vars.AZURE_RESOURCE_GROUP || 'stayflow-rg-south' }}
-      INFRA_LOCATION: ${{ github.event.inputs.location || vars.AZURE_INFRA_LOCATION || 'southcentralus' }}
       ENVIRONMENT_NAME: ${{ github.event.inputs.environment_name || vars.AZURE_ENVIRONMENT_NAME || 'stayflow-prod' }}
     outputs:
-      acr_name: ${{ steps.infra.outputs.acr_name }}
-      acr_login_server: ${{ steps.infra.outputs.acr_login_server }}
-      identity_name: ${{ steps.infra.outputs.identity_name }}
+      container_env_name: ${{ steps.environment.outputs.container_env_name }}
+      container_env_resource_group: ${{ steps.environment.outputs.container_env_resource_group }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,45 +57,31 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Create resource group
-        uses: azure/cli@v2
-        with:
-          inlineScript: az group create --name "$RESOURCE_GROUP" --location "$INFRA_LOCATION"
-
-      - name: Provision infrastructure
-        id: infra
+      - name: Validate existing Container Apps environment
+        id: environment
         uses: azure/cli@v2
         with:
           inlineScript: |
-            az deployment group create \
-              --resource-group "$RESOURCE_GROUP" \
-              --template-file deploy/azure/main.bicep \
-              --parameters environmentName="$ENVIRONMENT_NAME" \
-              --parameters location="$INFRA_LOCATION" \
-              --output json > deployment.json
-            echo "acr_name=$(jq -r '.properties.outputs.acrName.value' deployment.json)" >> "$GITHUB_OUTPUT"
-            echo "acr_login_server=$(jq -r '.properties.outputs.acrLoginServer.value' deployment.json)" >> "$GITHUB_OUTPUT"
-            echo "identity_name=$(jq -r '.properties.outputs.identityName.value' deployment.json)" >> "$GITHUB_OUTPUT"
+            container_env_name="${{ vars.AZURE_CONTAINER_ENV_NAME }}"
+            container_env_resource_group="${{ vars.AZURE_CONTAINER_ENV_RESOURCE_GROUP }}"
+            test -n "$container_env_name"
+            test -n "$container_env_resource_group"
+            az containerapp env show --name "$container_env_name" --resource-group "$container_env_resource_group" --output none
+            echo "container_env_name=$container_env_name" >> "$GITHUB_OUTPUT"
+            echo "container_env_resource_group=$container_env_resource_group" >> "$GITHUB_OUTPUT"
 
-  # ────────────────────────────────────────────────────────────────────────────
-  # JOB 2: Build → Scan → SBOM → Sign → Attest each image.
-  # The image is only pushed to ACR AFTER it passes the Trivy gate.
-  # Supply-chain provenance is attached via SLSA attestation.
-  # ────────────────────────────────────────────────────────────────────────────
   build-sign-attest:
-    name: Build, Scan & Attest — ${{ matrix.name }}
+    name: Build, Scan & Attest - ${{ matrix.name }}
     runs-on: ubuntu-latest
-    needs: provision
     environment: production
-    env:
-      API_URL: ${{ vars.AZURE_API_URL }}
-      WEB_URL: ${{ vars.AZURE_WEB_URL }}
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: read
-      id-token: write       # Azure OIDC + Cosign keyless signing
-      attestations: write   # github/attest-build-provenance SLSA provenance
+      id-token: write
+      attestations: write
+      packages: write
     strategy:
-      fail-fast: true       # If any image fails the security gate, abort all
+      fail-fast: true
       matrix:
         include:
           - name: api
@@ -119,56 +99,54 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Azure login
-        uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ref: ${{ env.IMAGE_TAG }}
+
+      - name: Validate public URLs
+        env:
+          API_URL: ${{ vars.AZURE_API_URL }}
+          WEB_URL: ${{ vars.AZURE_WEB_URL }}
+        run: |
+          [[ "$API_URL" =~ ^https://[^/]+$ ]]
+          [[ "$WEB_URL" =~ ^https://[^/]+$ ]]
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ── STEP 1: Build ───────────────────────────────────────────────────────
-      # Build first into the local daemon (load:true) for scanning.
-      # We do NOT push yet — the image must pass the security gate first.
+      - name: Resolve GHCR image reference
+        id: image
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "ref=${IMAGE_REGISTRY}/${owner}/${{ matrix.image }}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "name=${IMAGE_REGISTRY}/${owner}/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
+
       - name: Build image (local, pre-scan)
-        id: build
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           load: true
           push: false
-          tags: ${{ matrix.image }}:${{ env.IMAGE_TAG }}
+          tags: ${{ steps.image.outputs.ref }}
           build-args: |
             NEXT_PUBLIC_SITE_URL=${{ vars.AZURE_WEB_URL }}
             NEXT_PUBLIC_OIDC_AUTHORITY=${{ vars.AZURE_API_URL }}
           cache-from: type=gha,scope=azure-${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=azure-${{ matrix.name }}
 
-      # ── STEP 2: Security gate ───────────────────────────────────────────────
-      # Trivy scans the built image for HIGH and CRITICAL vulnerabilities.
-      # exit-code: '1' BLOCKS the pipeline — the image is never pushed if
-      # this fails. This is the hard security gate before any deployment.
-      - name: Trivy image scan (security gate — BLOCKING)
+      - name: Trivy image scan (blocking)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ matrix.image }}:${{ env.IMAGE_TAG }}
+          image-ref: ${{ steps.image.outputs.ref }}
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: '1'
 
-      # ── STEP 3: SBOM (Software Bill of Materials) ───────────────────────────
-      # Generate a CycloneDX SBOM for the image. This documents every
-      # package and dependency inside the container for supply-chain auditing,
-      # license compliance, and future vulnerability tracking.
       - name: Generate SBOM (CycloneDX)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ matrix.image }}:${{ env.IMAGE_TAG }}
+          image-ref: ${{ steps.image.outputs.ref }}
           format: cyclonedx
           output: sbom-${{ matrix.name }}.cdx.json
           exit-code: '0'
@@ -180,48 +158,28 @@ jobs:
           path: sbom-${{ matrix.name }}.cdx.json
           retention-days: 90
 
-      # ── STEP 4: Push to ACR ─────────────────────────────────────────────────
-      # Only reached if Trivy passed. Push the exact image that was scanned
-      # (same digest) to Azure Container Registry.
-      - name: Docker login to ACR
-        run: |
-          token=$(az acr login --name "${{ needs.provision.outputs.acr_name }}" --expose-token --query accessToken --output tsv)
-          echo "$token" | docker login "${{ needs.provision.outputs.acr_login_server }}" \
-            --username 00000000-0000-0000-0000-000000000000 \
-            --password-stdin
-
-      - name: Push image to ACR
-        id: push
-        uses: docker/build-push-action@v6
+      - name: Docker login to GHCR
+        uses: docker/login-action@v3
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
-          push: true
-          tags: ${{ needs.provision.outputs.acr_login_server }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
-          build-args: |
-            NEXT_PUBLIC_SITE_URL=${{ vars.AZURE_WEB_URL }}
-            NEXT_PUBLIC_OIDC_AUTHORITY=${{ vars.AZURE_API_URL }}
-          # Reuse the cached layers — no rebuild needed.
-          cache-from: type=gha,scope=azure-${{ matrix.name }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── STEP 5: SLSA Provenance Attestation ────────────────────────────────
-      # Attach a signed SLSA Build Provenance attestation to the image in ACR.
-      # This proves: who built it, when, from which commit, with which workflow.
-      # Consumers can verify the attestation with: cosign verify-attestation ...
+      - name: Push image to GHCR
+        id: push
+        run: |
+          docker push "${{ steps.image.outputs.ref }}"
+          repo_digest=$(docker inspect --format='{{ index .RepoDigests 0 }}' "${{ steps.image.outputs.ref }}")
+          echo "digest=${repo_digest#*@}" >> "$GITHUB_OUTPUT"
+
       - name: Attest build provenance
         if: github.event.repository.private == false
         uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ${{ needs.provision.outputs.acr_login_server }}/${{ matrix.image }}
+          subject-name: ${{ steps.image.outputs.name }}
           subject-digest: ${{ steps.push.outputs.digest }}
-          # push-to-registry: false because ACR doesn't yet support OCI referrers
-          # natively in all regions. The attestation is stored in GitHub's registry.
-          push-to-registry: false
+          push-to-registry: true
 
-  # ────────────────────────────────────────────────────────────────────────────
-  # JOB 3: Deploy — only runs after ALL images pass the security gate.
-  # Uses the exact immutable digest from the push step.
-  # ────────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to Azure Container Apps
     runs-on: ubuntu-latest
@@ -231,13 +189,17 @@ jobs:
       RESOURCE_GROUP: ${{ github.event.inputs.resource_group || vars.AZURE_RESOURCE_GROUP || 'stayflow-rg-south' }}
       APP_LOCATION: ${{ vars.AZURE_APP_LOCATION || 'westus3' }}
       ENVIRONMENT_NAME: ${{ github.event.inputs.environment_name || vars.AZURE_ENVIRONMENT_NAME || 'stayflow-prod' }}
-      CONTAINER_ENV_NAME: ${{ vars.AZURE_CONTAINER_ENV_NAME }}
-      CONTAINER_ENV_RESOURCE_GROUP: ${{ vars.AZURE_CONTAINER_ENV_RESOURCE_GROUP || 'rg-app-container' }}
+      CONTAINER_ENV_NAME: ${{ needs.provision.outputs.container_env_name }}
+      CONTAINER_ENV_RESOURCE_GROUP: ${{ needs.provision.outputs.container_env_resource_group }}
       API_URL: ${{ vars.AZURE_API_URL }}
       WEB_URL: ${{ vars.AZURE_WEB_URL }}
+      GHCR_AUTH_ENABLED: ${{ vars.GHCR_AUTH_ENABLED || 'true' }}
+      GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.IMAGE_TAG }}
 
       - name: Azure login
         uses: azure/login@v2
@@ -246,31 +208,32 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy immutable images
+      - name: Validate GHCR pull credentials
+        run: |
+          if [ "$GHCR_AUTH_ENABLED" = "true" ] && [ -z "$GHCR_READ_TOKEN" ]; then
+            echo "GHCR_AUTH_ENABLED=true requires the GHCR_READ_TOKEN secret with read:packages."
+            exit 1
+          fi
+
+      - name: Update migration job image
         uses: azure/cli@v2
         with:
           inlineScript: |
-            az deployment group create \
+            owner="${GITHUB_REPOSITORY_OWNER,,}"
+            az containerapp job registry set \
               --resource-group "$RESOURCE_GROUP" \
-              --template-file deploy/azure/apps.bicep \
-              --parameters environmentName="$ENVIRONMENT_NAME" \
-              --parameters location="$APP_LOCATION" \
-              --parameters acrName="${{ needs.provision.outputs.acr_name }}" \
-              --parameters containerEnvName="$CONTAINER_ENV_NAME" \
-              --parameters containerEnvResourceGroup="$CONTAINER_ENV_RESOURCE_GROUP" \
-              --parameters identityName="${{ needs.provision.outputs.identity_name }}" \
-              --parameters neonConnectionString="${{ secrets.NEON_CONNECTION_STRING }}" \
-              --parameters apiImage="${{ needs.provision.outputs.acr_login_server }}/stayflow-api:${{ env.IMAGE_TAG }}" \
-              --parameters migrationImage="${{ needs.provision.outputs.acr_login_server }}/stayflow-migrations:${{ env.IMAGE_TAG }}" \
-              --parameters webImage="${{ needs.provision.outputs.acr_login_server }}/stayflow-web:${{ env.IMAGE_TAG }}" \
-              --parameters siteUrl="$WEB_URL" \
-              --parameters oidcAuthority="$API_URL" \
-              --parameters adminEmail="${{ secrets.STAYFLOW_ADMIN_EMAIL }}" \
-              --parameters adminPassword="${{ secrets.STAYFLOW_ADMIN_PASSWORD }}" \
-              --parameters serviceClientSecret="${{ secrets.STAYFLOW_SERVICE_CLIENT_SECRET }}" \
-              --parameters minReplicas=0
+              --name "$ENVIRONMENT_NAME-migrations" \
+              --server "$IMAGE_REGISTRY" \
+              --username "${{ vars.GHCR_USERNAME }}" \
+              --password "${{ secrets.GHCR_READ_TOKEN }}" \
+              --output none
+            az containerapp job update \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$ENVIRONMENT_NAME-migrations" \
+              --image "$IMAGE_REGISTRY/$owner/stayflow-migrations:${{ env.IMAGE_TAG }}" \
+              --output none
 
-      - name: Run migrations and seed
+      - name: Run migrations and seed before application rollout
         uses: azure/cli@v2
         with:
           inlineScript: |
@@ -291,28 +254,59 @@ jobs:
                 --output tsv)
 
               echo "Migration job status: $job_status"
-
-              if [ "$job_status" = "Succeeded" ]; then
-                exit 0
-              fi
-
-              if [ "$job_status" = "Failed" ] || [ "$job_status" = "Canceled" ]; then
-                exit 1
-              fi
-
+              if [ "$job_status" = "Succeeded" ]; then exit 0; fi
+              if [ "$job_status" = "Failed" ] || [ "$job_status" = "Canceled" ]; then exit 1; fi
               sleep 10
             done
 
             echo "Migration job timed out waiting for completion."
             exit 1
 
+      - name: Deploy immutable images
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            owner="${GITHUB_REPOSITORY_OWNER,,}"
+            az deployment group create \
+              --resource-group "$RESOURCE_GROUP" \
+              --template-file deploy/azure/apps.bicep \
+              --parameters environmentName="$ENVIRONMENT_NAME" \
+              --parameters location="$APP_LOCATION" \
+              --parameters containerEnvName="$CONTAINER_ENV_NAME" \
+              --parameters containerEnvResourceGroup="$CONTAINER_ENV_RESOURCE_GROUP" \
+              --parameters neonConnectionString="${{ secrets.NEON_CONNECTION_STRING }}" \
+              --parameters registryServer="$IMAGE_REGISTRY" \
+              --parameters registryAuthenticationEnabled="$GHCR_AUTH_ENABLED" \
+              --parameters registryUsername="${{ vars.GHCR_USERNAME || github.actor }}" \
+              --parameters registryPassword="${{ secrets.GHCR_READ_TOKEN }}" \
+              --parameters apiImage="$IMAGE_REGISTRY/$owner/stayflow-api:${{ env.IMAGE_TAG }}" \
+              --parameters migrationImage="$IMAGE_REGISTRY/$owner/stayflow-migrations:${{ env.IMAGE_TAG }}" \
+              --parameters webImage="$IMAGE_REGISTRY/$owner/stayflow-web:${{ env.IMAGE_TAG }}" \
+              --parameters siteUrl="$WEB_URL" \
+              --parameters oidcAuthority="$API_URL" \
+              --parameters adminEmail="${{ secrets.STAYFLOW_ADMIN_EMAIL }}" \
+              --parameters adminPassword="${{ secrets.STAYFLOW_ADMIN_PASSWORD }}" \
+              --parameters serviceClientSecret="${{ secrets.STAYFLOW_SERVICE_CLIENT_SECRET }}" \
+              --parameters minReplicas=0
+
+      - name: Post-deployment smoke test
+        env:
+          STAGING_API_URL: ${{ vars.AZURE_API_URL }}
+          SMOKE_CLIENT_ID: stayflow-service
+          SMOKE_CLIENT_SECRET: ${{ secrets.STAYFLOW_SERVICE_CLIENT_SECRET }}
+        run: |
+          bash scripts/staging-smoke.sh
+          curl -fsS "$WEB_URL" >/dev/null
+
       - name: Deployment summary
         run: |
-          echo "### ✅ Azure deployment — ${{ env.IMAGE_TAG }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| | URL |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 🌐 Web | $WEB_URL |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 🔌 API | $API_URL |" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Security gates: Trivy ✅ | SBOM ✅ | SLSA provenance skipped for private user repo" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Azure deployment - ${{ env.IMAGE_TAG }}"
+            echo ""
+            echo "| | URL |"
+            echo "|---|---|"
+            echo "| Web | $WEB_URL |"
+            echo "| API | $API_URL |"
+            echo ""
+            echo "Images: GHCR | Security gates: Trivy, SBOM, SLSA provenance"
+          } >> "$GITHUB_STEP_SUMMARY"

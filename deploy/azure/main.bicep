@@ -7,30 +7,38 @@ param location string = resourceGroup().location
 
 var normalizedName = toLower(replace(environmentName, '_', '-'))
 var unique = uniqueString(resourceGroup().id, normalizedName)
-var acrName = 'sf${unique}'
 var apiAppName = '${normalizedName}-api'
 var webAppName = '${normalizedName}-web'
-var identityName = '${normalizedName}-aca-pull'
+var workspaceName = '${normalizedName}-logs-${unique}'
+var containerEnvName = '${normalizedName}-cae'
 
-resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
-  name: acrName
+resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+  name: workspaceName
   location: location
-  sku: {
-    name: 'Basic'
-  }
   properties: {
-    adminUserEnabled: false
-    publicNetworkAccess: 'Enabled'
+    sku: {
+      name: 'PerGB2018'
+    }
+    retentionInDays: 30
   }
 }
 
-resource pullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: identityName
+resource containerEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
+  name: containerEnvName
   location: location
+  properties: {
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsConfiguration: {
+        customerId: workspace.properties.customerId
+        sharedKey: workspace.listKeys().primarySharedKey
+      }
+    }
+  }
 }
 
-output acrName string = acr.name
-output acrLoginServer string = acr.properties.loginServer
 output apiAppName string = apiAppName
-output identityName string = pullIdentity.name
+output containerEnvName string = containerEnv.name
+output containerEnvResourceGroup string = resourceGroup().name
+output logAnalyticsWorkspaceName string = workspace.name
 output webAppName string = webAppName

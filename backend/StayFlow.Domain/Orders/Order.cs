@@ -84,6 +84,11 @@ public sealed class Order : TenantEntity
         {
             return;
         }
+
+        if (Status != OrderStatus.Preparing)
+        {
+            throw new DomainException($"Cannot mark order as delivered from {Status} status.");
+        }
             
         Status = OrderStatus.Delivered;
         DeliveredAtUtc = DateTimeOffset.UtcNow;

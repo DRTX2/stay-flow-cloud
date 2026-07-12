@@ -92,7 +92,7 @@ behaviors for validation and logging.
 | Observability | OpenTelemetry, Serilog, Prometheus, Grafana |
 | Testing | xUnit, Testcontainers, WebApplicationFactory, FluentAssertions |
 | Packaging | Docker, Docker Compose |
-| IaC | Azure Bicep (Container Apps, ACR, PostgreSQL) + Terraform reference for AWS |
+| IaC | Azure Bicep (Container Apps with GHCR images) + Terraform reference for AWS |
 | CI/CD | GitHub Actions, CodeQL, Trivy, Dependabot, Azure OIDC |
 
 Dependencies are governed centrally via `Directory.Packages.props` (Central Package Management) with
@@ -283,10 +283,9 @@ dotnet test
 
 GitHub Actions provides the DevSecOps baseline:
 
-1. **ci.yml** — restore/build/test backend, lint/typecheck/test/build frontend, run Playwright E2E, build Docker images and run Trivy.
-2. **codeql.yml** — SAST for C# and TypeScript on PRs, `main` and weekly schedule.
-3. **dependency-review.yml** — blocks high-risk dependency changes in PRs.
-4. **deploy-azure.yml** — provisions Azure with Bicep, builds immutable images, pushes to ACR and deploys Container Apps using GitHub OIDC.
+1. **ci.yml** — restore/build/test backend, lint/typecheck/test/build frontend, run Playwright E2E, CodeQL, secret/IaC scans, Docker builds and Trivy image gates.
+2. **dependency-review.yml** — blocks high-risk dependency changes in PRs.
+3. **deploy-azure.yml** — provisions Azure with Bicep, builds immutable images, pushes to GHCR and deploys Container Apps using GitHub OIDC.
 5. **dependabot.yml** — keeps GitHub Actions, NuGet, npm and Docker bases current.
 
 See [`docs/DEVSECOPS.md`](docs/DEVSECOPS.md) for the control map.
@@ -301,12 +300,10 @@ The primary student-friendly deployment path is Azure Container Apps + Azure Dat
 az group create --name rg-stayflow-dev --location eastus
 az deployment group create \
   --resource-group rg-stayflow-dev \
-  --template-file deploy/azure/main.bicep \
-  --parameters postgresAdminPassword='<strong-password>'
+  --template-file deploy/azure/main.bicep
 ```
 
-The automated path is `.github/workflows/deploy-azure.yml`. Configure the required GitHub secrets
-from [`deploy/azure/README.md`](deploy/azure/README.md), then push to `main` or run the workflow manually.
+The automated path is `.github/workflows/deploy-azure.yml`. It publishes images to GHCR instead of ACR to avoid Azure Container Registry charges. Configure the required GitHub secrets from [`deploy/azure/README.md`](deploy/azure/README.md), then push to `main` or run the workflow manually.
 
 ---
 

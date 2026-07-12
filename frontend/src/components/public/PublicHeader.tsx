@@ -6,6 +6,9 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 export function PublicHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -16,16 +19,20 @@ export function PublicHeader() {
           </span>
         </Link>
 
-        <nav className="ml-6 hidden items-center gap-1 text-sm md:flex">
+        <nav
+          aria-label="Main navigation"
+          className="ml-2 flex items-center gap-1 text-sm sm:ml-6"
+        >
           <Link
             href="/hotels"
-            className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:text-foreground"
+            className="rounded-md px-2 py-2 text-muted-foreground transition-colors hover:text-foreground sm:px-3"
           >
-            Hotels
+            <span className="sm:hidden">Stay</span>
+            <span className="hidden sm:inline">Hotels</span>
           </Link>
           <Link
             href="/pricing"
-            className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:text-foreground"
+            className="hidden rounded-md px-3 py-2 text-muted-foreground transition-colors hover:text-foreground sm:inline-flex"
           >
             Pricing
           </Link>

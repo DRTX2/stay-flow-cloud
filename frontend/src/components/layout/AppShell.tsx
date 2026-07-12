@@ -13,6 +13,9 @@ function ShellInner({ user, children }: { user: UserMenuUser; children: ReactNod
 
   return (
     <div className="flex min-h-screen w-full bg-muted/30">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <aside
         className={cn(
           "hidden shrink-0 border-r bg-background transition-[width] duration-200 md:block",
@@ -26,7 +29,7 @@ function ShellInner({ user, children }: { user: UserMenuUser; children: ReactNod
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar user={user} />
-        <main className="flex-1 p-4 sm:p-6">
+        <main id="main-content" tabIndex={-1} className="flex-1 p-4 sm:p-6">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>

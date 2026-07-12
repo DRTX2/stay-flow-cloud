@@ -7,10 +7,10 @@ This folder contains the Azure baseline used by GitHub Actions. It targets Azure
 | Concern | Azure resource |
 |---|---|
 | Containers | Azure Container Apps, consumption plan |
-| Registry | Azure Container Registry Basic, admin disabled |
+| Registry | GitHub Container Registry (`ghcr.io`) |
 | Database | Azure Database for PostgreSQL Flexible Server, burstable B1ms |
 | Logs | Log Analytics workspace |
-| Identity | GitHub Actions OIDC + managed identity AcrPull |
+| Identity | GitHub Actions OIDC for Azure + GHCR token for private image pulls |
 
 ## Deploy
 
@@ -21,17 +21,28 @@ Use `.github/workflows/deploy-azure.yml`. Required GitHub repository secrets:
 | `AZURE_CLIENT_ID` | Federated app registration/client ID for GitHub Actions |
 | `AZURE_TENANT_ID` | Microsoft Entra tenant ID |
 | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-| `AZURE_POSTGRES_ADMIN_PASSWORD` | Strong PostgreSQL admin password |
+| `NEON_CONNECTION_STRING` | PostgreSQL connection string used by the apps and migration job |
+| `STAYFLOW_ADMIN_EMAIL` | Initial platform administrator email |
+| `STAYFLOW_ADMIN_PASSWORD` | Initial platform administrator password |
+| `STAYFLOW_SERVICE_CLIENT_SECRET` | Seeded service-to-service OAuth client secret |
+| `GHCR_READ_TOKEN` | GitHub token/PAT with `read:packages` for private GHCR packages |
 
 Optional GitHub repository variables:
 
 | Variable | Default |
 |---|---|
 | `AZURE_RESOURCE_GROUP` | `rg-stayflow-dev` |
-| `AZURE_LOCATION` | `eastus` |
+| `AZURE_INFRA_LOCATION` | `southcentralus` |
+| `AZURE_APP_LOCATION` | `westus3` |
 | `AZURE_ENVIRONMENT_NAME` | `stayflow-dev` |
+| `AZURE_API_URL` | Public API/OIDC URL |
+| `AZURE_WEB_URL` | Public frontend URL |
+| `GHCR_USERNAME` | GitHub user/bot for private GHCR pulls; defaults to workflow actor |
+| `GHCR_AUTH_ENABLED` | `true`; set `false` only when GHCR packages are public |
 
-The workflow provisions infrastructure with `main.bicep`, reads the generated API/frontend hostnames, builds images with the correct Next.js public URLs, pushes them to ACR, then deploys the Container Apps with `apps.bicep` and immutable image tags.
+The workflow provisions Log Analytics and an Azure Container Apps environment with `main.bicep`, builds images with the correct Next.js public URLs, scans them, publishes immutable commit-SHA tags to GHCR, then deploys Container Apps with `apps.bicep`.
+
+To avoid Azure Container Registry charges, this baseline does not create ACR. If packages are public in GHCR, set `GHCR_AUTH_ENABLED=false`. For private packages, keep it `true` and configure `GHCR_READ_TOKEN`.
 
 ## Cost Notes
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { getHotels } from "@/content/hotels";
 import { BookingForm, type BookingHotel } from "@/features/booking/BookingForm";
+import { getJson } from "@/server/api";
 
 export const metadata: Metadata = {
   title: "Book a stay",
@@ -14,7 +14,7 @@ export default async function BookPage({
   searchParams: Promise<{ hotel?: string; roomType?: string }>;
 }) {
   const { hotel, roomType } = await searchParams;
-  const hotels = await getHotels();
+  const hotels = await getJson<BookingHotel[]>("/api/v1/public/hotels", { auth: false });
 
   const formHotels: BookingHotel[] = hotels.map((h) => ({
     slug: h.slug,
@@ -23,11 +23,12 @@ export default async function BookPage({
       id: rt.id,
       name: rt.name ?? rt.id,
       baseRate: rt.baseRate ?? 0,
+      maxOccupancy: rt.maxOccupancy,
     })),
   }));
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-12 sm:px-6">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl px-4 py-12 sm:px-6">
       <h1 className="text-3xl font-bold tracking-tight">Book your stay</h1>
       <p className="mt-1 text-muted-foreground">
         Send a booking enquiry and our team will confirm availability.

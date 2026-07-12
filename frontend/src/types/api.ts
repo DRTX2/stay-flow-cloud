@@ -67,6 +67,8 @@ export interface FrontDeskToday {
   outOfServiceRooms?: number;
   pendingHousekeepingTasks?: number;
   openMaintenanceWorkOrders?: number;
+  pendingBookingEnquiries?: number;
+  openOrders?: number;
   arrivalList?: FrontDeskReservationItem[];
   departureList?: FrontDeskReservationItem[];
   roomIssues?: FrontDeskRoomIssue[];
@@ -300,6 +302,33 @@ export interface BookingRequest {
   fullName: string;
   email: string;
   phone?: string;
+}
+
+export interface BookingEnquiry {
+  id: string;
+  reference: string;
+  roomTypeId: string;
+  roomTypeName: string;
+  checkIn: string;
+  checkOut: string;
+  numberOfGuests: number;
+  fullName: string;
+  email: string;
+  phone?: string;
+  status: "Pending" | "Converted" | "Rejected" | string;
+  rejectionReason?: string;
+  reservationId?: string;
+  createdAtUtc: string;
+}
+
+export interface StayFeedback {
+  id: string;
+  reservationId: string;
+  confirmationCode: string;
+  guestName: string;
+  rating: number;
+  comment?: string;
+  submittedAtUtc: string;
 }
 
 // --- Operations Expansion ---------------------------------------------------

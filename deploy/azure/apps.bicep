@@ -4,21 +4,28 @@ param environmentName string = 'stayflow-dev'
 @description('Azure region for all resources.')
 param location string = resourceGroup().location
 
-@description('Azure Container Registry name created by main.bicep.')
-param acrName string
-
 @description('Azure Container Apps managed environment name.')
 param containerEnvName string
 
 @description('Azure Container Apps managed environment resource group.')
 param containerEnvResourceGroup string = 'rg-app-container'
 
-@description('User-assigned managed identity name with AcrPull rights.')
-param identityName string
-
 @secure()
 @description('Neon PostgreSQL connection string.')
 param neonConnectionString string
+
+@description('Container registry server used by Azure Container Apps.')
+param registryServer string = 'ghcr.io'
+
+@description('Enable registry credentials. Set to false only for public GHCR packages.')
+param registryAuthenticationEnabled bool = true
+
+@description('Container registry username. For GHCR, use a GitHub user or bot account.')
+param registryUsername string = ''
+
+@secure()
+@description('Container registry password/token. For private GHCR packages, use a PAT with read:packages.')
+param registryPassword string = ''
 
 @description('Container image for the ASP.NET Core API.')
 param apiImage string
@@ -61,30 +68,23 @@ var normalizedName = toLower(replace(environmentName, '_', '-'))
 var apiAppName = '${normalizedName}-api'
 var webAppName = '${normalizedName}-web'
 var postgresConnectionString = neonConnectionString
-
-resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
-  name: acrName
-}
+var registryPasswordSecretName = 'container-registry-password'
+var registryConfiguration = registryAuthenticationEnabled ? [
+  {
+    server: registryServer
+    username: registryUsername
+    passwordSecretRef: registryPasswordSecretName
+  }
+] : []
 
 resource containerEnv 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: containerEnvName
   scope: resourceGroup(containerEnvResourceGroup)
 }
 
-resource pullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
-  name: identityName
-}
-
-
 resource api 'Microsoft.App/containerApps@2024-03-01' = {
   name: apiAppName
   location: location
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${pullIdentity.id}': {}
-    }
-  }
   properties: {
     managedEnvironmentId: containerEnv.id
     configuration: {
@@ -95,18 +95,18 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 8080
         transport: 'auto'
       }
-      registries: [
-        {
-          server: acr.properties.loginServer
-          identity: pullIdentity.id
-        }
-      ]
-      secrets: [
+      registries: registryConfiguration
+      secrets: concat([
         {
           name: 'postgres-connection-string'
           value: postgresConnectionString
         }
-      ]
+      ], registryAuthenticationEnabled ? [
+        {
+          name: registryPasswordSecretName
+          value: registryPassword
+        }
+      ] : [])
     }
     template: {
       containers: [
@@ -180,12 +180,6 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
 resource migrationJob 'Microsoft.App/jobs@2024-03-01' = {
   name: '${normalizedName}-migrations'
   location: location
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${pullIdentity.id}': {}
-    }
-  }
   properties: {
     environmentId: containerEnv.id
     configuration: {
@@ -196,13 +190,8 @@ resource migrationJob 'Microsoft.App/jobs@2024-03-01' = {
         parallelism: 1
         replicaCompletionCount: 1
       }
-      registries: [
-        {
-          server: acr.properties.loginServer
-          identity: pullIdentity.id
-        }
-      ]
-      secrets: [
+      registries: registryConfiguration
+      secrets: concat([
         {
           name: 'postgres-connection-string'
           value: postgresConnectionString
@@ -219,7 +208,12 @@ resource migrationJob 'Microsoft.App/jobs@2024-03-01' = {
           name: 'service-client-secret'
           value: serviceClientSecret
         }
-      ]
+      ], registryAuthenticationEnabled ? [
+        {
+          name: registryPasswordSecretName
+          value: registryPassword
+        }
+      ] : [])
     }
     template: {
       containers: [
@@ -280,12 +274,6 @@ resource migrationJob 'Microsoft.App/jobs@2024-03-01' = {
 resource web 'Microsoft.App/containerApps@2024-03-01' = {
   name: webAppName
   location: location
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${pullIdentity.id}': {}
-    }
-  }
   properties: {
     managedEnvironmentId: containerEnv.id
     configuration: {
@@ -296,12 +284,13 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 3000
         transport: 'auto'
       }
-      registries: [
+      registries: registryConfiguration
+      secrets: registryAuthenticationEnabled ? [
         {
-          server: acr.properties.loginServer
-          identity: pullIdentity.id
+          name: registryPasswordSecretName
+          value: registryPassword
         }
-      ]
+      ] : []
     }
     template: {
       containers: [

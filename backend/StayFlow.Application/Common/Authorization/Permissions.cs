@@ -23,6 +23,7 @@ public static class Permissions
     public const string BillingManage = "billing:manage";
 
     public const string AnalyticsView = "analytics:view";
+    public const string FeedbackRead = "feedback:read";
 
     public const string HousekeepingManage = "housekeeping:manage";
     public const string MaintenanceManage = "maintenance:manage";
@@ -43,6 +44,7 @@ public static class Permissions
         ServicesRead, ServicesManage,
         BillingRead, BillingManage,
         AnalyticsView,
+        FeedbackRead,
         HousekeepingManage,
         MaintenanceManage,
         OrdersManage,

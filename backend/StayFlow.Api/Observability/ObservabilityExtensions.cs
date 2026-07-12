@@ -110,7 +110,8 @@ public static class ObservabilityExtensions
                 name = entry.Key,
                 status = entry.Value.Status.ToString(),
                 durationMs = entry.Value.Duration.TotalMilliseconds,
-                error = entry.Value.Exception?.Message,
+                // Detailed dependency failures belong in internal logs, not public probes.
+                error = entry.Value.Exception is null ? null : "Dependency check failed.",
             }),
         };
 

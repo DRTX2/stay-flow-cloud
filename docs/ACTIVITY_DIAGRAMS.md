@@ -150,7 +150,7 @@ flowchart LR
         Build[Build &\nCompile]
         Test[Run Tests]
         DockerBuild[Docker Build\n(API + Web)]
-        Push[Push to\nAzure ACR]
+        Push[Push to\nGHCR]
         Deploy[Deploy to\nAzure Container Apps]
     end
 

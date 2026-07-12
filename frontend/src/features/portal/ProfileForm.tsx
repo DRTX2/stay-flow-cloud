@@ -80,8 +80,12 @@ export function ProfileForm({ guest }: ProfileFormProps) {
               name="email"
               type="email"
               defaultValue={guest?.email ?? ""}
-              required
+              disabled
+              aria-describedby="email-help"
             />
+            <p id="email-help" className="text-xs text-muted-foreground">
+              Contact the hotel to change the email linked to your stays.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>

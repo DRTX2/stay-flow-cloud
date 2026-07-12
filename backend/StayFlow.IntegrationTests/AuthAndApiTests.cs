@@ -209,6 +209,95 @@ public sealed class AuthAndApiTests(StayFlowApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task PublicBookingEnquiry_PersistsAndCanBeConvertedOnce()
+    {
+        var anonymous = factory.CreateClient();
+        var hotels = await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/public/hotels");
+        var hotel = hotels[0];
+        var roomType = hotel.GetProperty("roomTypes")[0];
+        var checkIn = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(120));
+        var checkOut = checkIn.AddDays(2);
+
+        var created = await anonymous.PostAsJsonAsync("/api/v1/public/bookings", new
+        {
+            hotelSlug = hotel.GetProperty("slug").GetString(),
+            roomTypeId = roomType.GetProperty("id").GetGuid(),
+            checkIn,
+            checkOut,
+            guests = 1,
+            fullName = "Public Test Guest",
+            email = $"public-{Guid.NewGuid():N}@example.com",
+            phone = "+1 555 0100",
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var reference = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("reference").GetString();
+
+        var client = await CreateAuthenticatedClientAsync();
+        var enquiries = await client.GetFromJsonAsync<JsonElement>("/api/v1/bookingenquiries?status=Pending&pageSize=100");
+        var enquiry = enquiries.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("reference").GetString() == reference);
+        var enquiryId = enquiry.GetProperty("id").GetGuid();
+        var requestedRoomTypeId = enquiry.GetProperty("roomTypeId").GetGuid();
+        var rooms = await client.GetFromJsonAsync<JsonElement>("/api/v1/rooms?pageSize=100");
+        var roomId = rooms.GetProperty("items").EnumerateArray()
+            .First(room => room.GetProperty("roomTypeId").GetGuid() == requestedRoomTypeId)
+            .GetProperty("id").GetGuid();
+
+        var converted = await client.PostAsJsonAsync($"/api/v1/bookingenquiries/{enquiryId}/convert", new { roomId });
+        converted.StatusCode.Should().Be(HttpStatusCode.OK);
+        var duplicate = await client.PostAsJsonAsync($"/api/v1/bookingenquiries/{enquiryId}/convert", new { roomId });
+        duplicate.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CheckedOutStay_FeedbackInvitationAcceptsOneResponse()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+        var roomId = (await client.GetFromJsonAsync<JsonElement>("/api/v1/rooms"))
+            .GetProperty("items").EnumerateArray()
+            .First(room => room.GetProperty("status").GetString() == "Available")
+            .GetProperty("id").GetGuid();
+        var guestId = (await client.GetFromJsonAsync<JsonElement>("/api/v1/guests"))
+            .GetProperty("items")[0].GetProperty("id").GetGuid();
+        var checkIn = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(240));
+        var created = await client.PostAsJsonAsync("/api/v1/reservations", new
+        {
+            roomId,
+            guestId,
+            checkIn,
+            checkOut = checkIn.AddDays(2),
+            numberOfGuests = 1,
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created, await created.Content.ReadAsStringAsync());
+        var reservationId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        (await client.PostAsync($"/api/v1/reservations/{reservationId}/confirm", null)).EnsureSuccessStatusCode();
+        (await client.PostAsync($"/api/v1/reservations/{reservationId}/check-in", null)).EnsureSuccessStatusCode();
+        (await client.PostAsync($"/api/v1/reservations/{reservationId}/check-out", null)).EnsureSuccessStatusCode();
+
+        var invitation = await client.PostAsync($"/api/v1/reservations/{reservationId}/feedback-invitation", null);
+        invitation.StatusCode.Should().Be(HttpStatusCode.OK);
+        var token = (await invitation.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString();
+        var anonymous = factory.CreateClient();
+        var submitted = await anonymous.PostAsJsonAsync("/api/v1/public/feedback", new
+        {
+            token,
+            rating = 5,
+            comment = "A verified integration-test stay.",
+        });
+        submitted.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var duplicate = await anonymous.PostAsJsonAsync("/api/v1/public/feedback", new
+        {
+            token,
+            rating = 1,
+        });
+        duplicate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var feedback = await client.GetFromJsonAsync<JsonElement>("/api/v1/feedback?pageSize=100");
+        feedback.GetProperty("items").EnumerateArray()
+            .Should().Contain(item => item.GetProperty("reservationId").GetGuid() == reservationId);
+    }
+
+    [Fact]
     public async Task Rooms_PostWithReadOnlyClient_IsForbidden()
     {
         var client = factory.CreateClient();

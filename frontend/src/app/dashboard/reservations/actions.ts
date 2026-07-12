@@ -7,6 +7,11 @@ import type { CreateReservationRequest } from "@/types/api";
 
 export type { ActionResult };
 
+export interface FeedbackInvitationResult extends ActionResult {
+  token?: string;
+  expiresAtUtc?: string;
+}
+
 function revalidateReservations() {
   revalidatePath("/dashboard/reservations");
   revalidatePath("/dashboard");
@@ -66,4 +71,15 @@ export async function generateInvoiceAction(
   revalidatePath("/dashboard/invoices");
   revalidatePath("/dashboard/reservations");
   return ok;
+}
+
+export async function createFeedbackInvitationAction(
+  id: string,
+): Promise<FeedbackInvitationResult> {
+  const res = await apiFetch(`/api/v1/reservations/${id}/feedback-invitation`, {
+    method: "POST",
+  });
+  if (!res.ok) return fail(res, "Could not create feedback invitation");
+  const data = (await res.json()) as { token: string; expiresAtUtc: string };
+  return { ok: true, ...data };
 }

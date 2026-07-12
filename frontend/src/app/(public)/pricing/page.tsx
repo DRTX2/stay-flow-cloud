@@ -62,7 +62,11 @@ const PLANS = [
 
 export default function PricingPage() {
   return (
-    <main className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="mx-auto max-w-7xl px-4 py-20 sm:px-6"
+    >
       <div className="mx-auto max-w-2xl text-center">
         <h1 className="text-4xl font-bold tracking-tight">
           Pricing that scales with you

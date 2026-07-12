@@ -15,12 +15,17 @@ public sealed class ServicesController : ApiControllerBase
     public async Task<ActionResult<IReadOnlyList<ServiceItemDto>>> List([FromQuery] bool activeOnly = false)
         => Ok(await Sender.Send(new GetServiceItemsQuery(activeOnly)));
 
+    [HttpGet("{id:guid}")]
+    [Authorize(Policy = Permissions.ServicesRead)]
+    public async Task<ActionResult<ServiceItemDto>> GetById(Guid id)
+        => Ok(await Sender.Send(new GetServiceItemByIdQuery(id)));
+
     [HttpPost]
     [Authorize(Policy = Permissions.ServicesManage)]
     public async Task<IActionResult> Create([FromBody] CreateServiceItemCommand command)
     {
         var id = await Sender.Send(command);
-        return CreatedAtAction(nameof(List), new { id }, new { id });
+        return CreatedAtAction(nameof(GetById), new { id }, new { id });
     }
 
     [HttpPut("{id:guid}")]

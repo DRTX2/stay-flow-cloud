@@ -18,38 +18,17 @@ export type { ActionResult };
 export async function updateProfileAction(
   input: CreateGuestRequest,
 ): Promise<ActionResult> {
-  // Try to find an existing guest by email so we can PUT instead of POST.
-  let guestId: string | undefined;
-  try {
-    const listRes = await apiFetch(
-      `/api/v1/guests?pageSize=1&search=${encodeURIComponent(input.email)}`,
-    );
-    if (listRes.ok) {
-      const body = (await listRes.json()) as { items?: { id: string; email?: string }[] };
-      const match = body.items?.find(
-        (g) => g.email?.toLowerCase() === input.email.toLowerCase(),
-      );
-      if (match) guestId = match.id;
-    }
-  } catch {
-    // Lookup failed — fall through to POST.
-  }
-
-  if (guestId) {
-    const res = await apiFetch(`/api/v1/guests/${guestId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) return fail(res, "Could not update profile");
-  } else {
-    const res = await apiFetch("/api/v1/guests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) return fail(res, "Could not save profile");
-  }
+  const res = await apiFetch("/api/v1/portal/profile", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      firstName: input.firstName,
+      lastName: input.lastName,
+      phone: input.phone,
+      documentNumber: input.documentNumber,
+    }),
+  });
+  if (!res.ok) return fail(res, "Could not update profile");
 
   revalidatePath("/portal/profile");
   revalidatePath("/portal");

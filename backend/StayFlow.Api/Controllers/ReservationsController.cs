@@ -5,6 +5,7 @@ using StayFlow.Application.Common.Models;
 using StayFlow.Application.Features.Reservations;
 using StayFlow.Application.Features.Reservations.Commands;
 using StayFlow.Application.Features.Reservations.Queries;
+using StayFlow.Application.Features.Feedback;
 using StayFlow.Domain.Reservations;
 
 namespace StayFlow.Api.Controllers;
@@ -76,6 +77,11 @@ public sealed class ReservationsController : ApiControllerBase
         var chargeId = await Sender.Send(new AddReservationChargeCommand(id, body.ServiceItemId, body.Quantity));
         return CreatedAtAction(nameof(GetById), new { id }, new { chargeId });
     }
+
+    [HttpPost("{id:guid}/feedback-invitation")]
+    [Authorize(Policy = Permissions.ReservationsManage)]
+    public async Task<ActionResult<FeedbackInvitationDto>> CreateFeedbackInvitation(Guid id)
+        => Ok(await Sender.Send(new CreateFeedbackInvitationCommand(id)));
 
     public sealed record CancelReservationBody(string? Reason);
 

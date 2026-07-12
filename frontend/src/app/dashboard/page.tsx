@@ -13,7 +13,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Executive overview of revenue, occupancy and operations."
+        description="Resolve today's arrivals, departures and operational queues from one place."
       />
       {/* Stream the analytics: the shell + header render instantly, KPIs/charts fill in. */}
       <Suspense fallback={<DashboardOverviewSkeleton />}>

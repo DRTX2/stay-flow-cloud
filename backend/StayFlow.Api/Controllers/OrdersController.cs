@@ -25,4 +25,28 @@ public sealed class OrdersController : ApiControllerBase
         var id = await Sender.Send(command);
         return Ok(new { id });
     }
+
+    [HttpPost("{id:guid}/prepare")]
+    [Authorize(Policy = Permissions.OrdersManage)]
+    public async Task<IActionResult> MarkPreparing(Guid id)
+    {
+        await Sender.Send(new MarkOrderPreparingCommand(id));
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/deliver")]
+    [Authorize(Policy = Permissions.OrdersManage)]
+    public async Task<IActionResult> MarkDelivered(Guid id)
+    {
+        await Sender.Send(new MarkOrderDeliveredCommand(id));
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = Permissions.OrdersManage)]
+    public async Task<IActionResult> Cancel(Guid id)
+    {
+        await Sender.Send(new CancelOrderCommand(id));
+        return NoContent();
+    }
 }

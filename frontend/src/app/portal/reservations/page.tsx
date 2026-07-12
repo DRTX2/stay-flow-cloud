@@ -14,7 +14,7 @@ export default async function PortalReservationsPage() {
   let failed = false;
 
   try {
-    reservations = await getList<Reservation>("/api/v1/reservations?pageSize=200");
+    reservations = await getList<Reservation>("/api/v1/portal/reservations");
   } catch {
     failed = true;
   }

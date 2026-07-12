@@ -1,7 +1,10 @@
 using System.ComponentModel.DataAnnotations;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using StayFlow.Application.Features.BookingEnquiries;
+using StayFlow.Application.Features.Feedback;
 
 namespace StayFlow.Api.Controllers;
 
@@ -14,8 +17,20 @@ namespace StayFlow.Api.Controllers;
 [ApiController]
 [Route("api/v1/public")]
 [Produces("application/json")]
-public sealed class PublicController(ILogger<PublicController> logger) : ControllerBase
+public sealed class PublicController(ISender sender) : ControllerBase
 {
+    [HttpGet("hotels")]
+    public async Task<ActionResult<IReadOnlyList<PublicHotelDto>>> GetHotels()
+        => Ok(await sender.Send(new GetPublicHotelsQuery()));
+
+    [HttpPost("feedback")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> SubmitFeedback([FromBody] SubmitFeedbackCommand command)
+    {
+        await sender.Send(command);
+        return NoContent();
+    }
+
     /// <summary>
     /// Accepts a public booking enquiry and returns a reference. Rate-limited (shared "auth" policy)
     /// because it is unauthenticated. This is a lead intake — it does not create operational records,
@@ -23,28 +38,25 @@ public sealed class PublicController(ILogger<PublicController> logger) : Control
     /// </summary>
     [HttpPost("bookings")]
     [EnableRateLimiting("auth")]
-    public ActionResult<BookingAck> CreateBooking([FromBody] PublicBookingRequest request)
+    public async Task<ActionResult<BookingAck>> CreateBooking([FromBody] PublicBookingRequest request)
     {
-        if (request.CheckOut <= request.CheckIn)
-        {
-            ModelState.AddModelError(nameof(request.CheckOut), "Check-out must be after check-in.");
-            return ValidationProblem(ModelState);
-        }
-
-        var reference = $"SF-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}";
-
-        logger.LogInformation(
-            "Public booking enquiry {Reference}: hotel {Hotel}, room type {RoomType}, {CheckIn:yyyy-MM-dd}→{CheckOut:yyyy-MM-dd}, {Guests} guest(s), contact {Email}",
-            reference, request.HotelSlug, request.RoomTypeId, request.CheckIn, request.CheckOut, request.Guests, request.Email);
-
-        return Accepted(new BookingAck(reference, "received"));
+        var receipt = await sender.Send(new CreateBookingEnquiryCommand(
+            request.HotelSlug,
+            request.RoomTypeId,
+            request.CheckIn,
+            request.CheckOut,
+            request.Guests,
+            request.FullName,
+            request.Email,
+            request.Phone));
+        return Accepted(new BookingAck(receipt.Reference, receipt.Status));
     }
 }
 
 /// <summary>Public booking enquiry payload. Validated by the [ApiController] model binder.</summary>
 public sealed record PublicBookingRequest(
     [Required] string HotelSlug,
-    [Required] string RoomTypeId,
+    [Required] Guid RoomTypeId,
     [Required] DateOnly CheckIn,
     [Required] DateOnly CheckOut,
     [Range(1, 20)] int Guests,

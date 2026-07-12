@@ -7,6 +7,9 @@ import {
   Gauge,
   LogIn,
   LogOut,
+  Inbox,
+  ShoppingBasket,
+  ArrowRight,
   TrendingUp,
   Wrench,
 } from "lucide-react";
@@ -125,12 +128,15 @@ export async function DashboardOverview() {
           label="Ops backlog"
           value={number(
             (frontDesk?.pendingHousekeepingTasks ?? 0) +
-              (frontDesk?.openMaintenanceWorkOrders ?? 0),
+              (frontDesk?.openMaintenanceWorkOrders ?? 0) +
+              (frontDesk?.pendingBookingEnquiries ?? 0) +
+              (frontDesk?.openOrders ?? 0),
           )}
           icon={ClipboardList}
         />
       </div>
 
+      <DailyOperationsCard frontDesk={frontDesk} />
       <FrontDeskBoard frontDesk={frontDesk} />
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -268,6 +274,81 @@ function FrontDeskBoard({ frontDesk }: { frontDesk: FrontDeskToday | null }) {
       />
       <RoomIssuesCard issues={frontDesk?.roomIssues ?? []} />
     </div>
+  );
+}
+
+function DailyOperationsCard({ frontDesk }: { frontDesk: FrontDeskToday | null }) {
+  const queues = [
+    {
+      label: "Arrivals today",
+      value: frontDesk?.arrivals ?? 0,
+      href: "/dashboard/reservations",
+      icon: LogIn,
+    },
+    {
+      label: "Departures today",
+      value: frontDesk?.departures ?? 0,
+      href: "/dashboard/reservations",
+      icon: LogOut,
+    },
+    {
+      label: "Booking enquiries",
+      value: frontDesk?.pendingBookingEnquiries ?? 0,
+      href: "/dashboard/booking-enquiries",
+      icon: Inbox,
+    },
+    {
+      label: "Open room orders",
+      value: frontDesk?.openOrders ?? 0,
+      href: "/dashboard/orders",
+      icon: ShoppingBasket,
+    },
+    {
+      label: "Housekeeping tasks",
+      value: frontDesk?.pendingHousekeepingTasks ?? 0,
+      href: "/dashboard/housekeeping",
+      icon: ClipboardList,
+    },
+    {
+      label: "Maintenance work orders",
+      value: frontDesk?.openMaintenanceWorkOrders ?? 0,
+      href: "/dashboard/maintenance",
+      icon: Wrench,
+    },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Today&apos;s operations</CardTitle>
+        <CardDescription>
+          Prioritized queues requiring attention across the property.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {queues.map((queue) => {
+          const Icon = queue.icon;
+          return (
+            <Link
+              key={queue.label}
+              href={queue.href}
+              className="group flex min-h-20 items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/50"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Icon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-2xl font-semibold tabular-nums">
+                  {number(queue.value)}
+                </span>
+                <span className="block text-sm text-muted-foreground">{queue.label}</span>
+              </span>
+              <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          );
+        })}
+      </CardContent>
+    </Card>
   );
 }
 

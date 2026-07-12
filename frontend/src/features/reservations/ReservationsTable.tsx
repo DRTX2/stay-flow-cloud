@@ -25,6 +25,7 @@ import {
   checkOutReservationAction,
   confirmReservationAction,
   generateInvoiceAction,
+  createFeedbackInvitationAction,
 } from "@/app/dashboard/reservations/actions";
 import { reservationColumns } from "./columns";
 
@@ -78,6 +79,21 @@ export function ReservationsTable({
         "Invoice generated",
         "Could not generate invoice",
       ),
+    onFeedback: (r) =>
+      startTransition(async () => {
+        const result = await createFeedbackInvitationAction(r.id);
+        if (!result.ok || !result.token) {
+          toast.error(result.error ?? "Could not create feedback link");
+          return;
+        }
+        const link = `${window.location.origin}/feedback#${result.token}`;
+        try {
+          await navigator.clipboard.writeText(link);
+          toast.success("Feedback link copied. It expires in 30 days.");
+        } catch {
+          toast.error("The browser blocked clipboard access. Please try again.");
+        }
+      }),
     onCancel: setToCancel,
     pending,
   });

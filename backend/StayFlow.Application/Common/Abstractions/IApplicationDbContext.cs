@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using StayFlow.Domain.Billing;
+using StayFlow.Domain.BookingEnquiries;
+using StayFlow.Domain.Feedback;
 using StayFlow.Domain.Guests;
 using StayFlow.Domain.Housekeeping;
 using StayFlow.Domain.Maintenance;
@@ -19,6 +21,8 @@ namespace StayFlow.Application.Common.Abstractions;
 public interface IApplicationDbContext
 {
     DbSet<Tenant> Tenants { get; }
+    DbSet<BookingEnquiry> BookingEnquiries { get; }
+    DbSet<ReservationFeedback> ReservationFeedback { get; }
     DbSet<RoomType> RoomTypes { get; }
     DbSet<Room> Rooms { get; }
     DbSet<Guest> Guests { get; }

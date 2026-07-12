@@ -9,6 +9,8 @@ const MAP: Record<string, BadgeProps["variant"]> = {
   issued: "default",
   paid: "success",
   cancelled: "destructive",
+  rejected: "destructive",
+  converted: "success",
   active: "success",
   inactive: "secondary",
   available: "success",

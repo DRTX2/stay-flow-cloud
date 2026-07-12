@@ -99,12 +99,11 @@ graph TB
 graph LR
     Dev["Developer\nWorkstation"]
     GH["GitHub\nRepository"]
-    ACR["Azure Container\nRegistry (ACR)"]
+    GHCR["GitHub Container\nRegistry (GHCR)"]
 
     subgraph ACA["Azure Container Apps Environment"]
         WebApp["stayflow-prod-web\n(Next.js - Port 3000)"]
         APIApp["stayflow-prod-api\n(ASP.NET Core - Port 8080)"]
-        ManagedId["User-Assigned\nManaged Identity\n(ACR Pull)"]
     end
 
     Neon[("Neon PostgreSQL\n(Serverless)")]
@@ -112,10 +111,9 @@ graph LR
     Internet["🌐 Internet"]
 
     Dev -->|git push| GH
-    GH -->|docker build + push| ACR
-    ACR -->|image pull via MI| WebApp
-    ACR -->|image pull via MI| APIApp
-    ManagedId -.->|authenticates| ACR
+    GH -->|docker build + scan + push| GHCR
+    GHCR -->|image pull via registry secret| WebApp
+    GHCR -->|image pull via registry secret| APIApp
     WebApp -->|server-to-server| APIApp
     APIApp --> Neon
     APIApp --> S3
@@ -170,6 +168,6 @@ graph LR
 | Database | PostgreSQL via Neon (serverless) | 17 |
 | Object Storage | S3-Compatible | — |
 | Container Platform | Azure Container Apps | — |
-| Image Registry | Azure Container Registry | — |
+| Image Registry | GitHub Container Registry | — |
 | IaC | Azure Bicep | — |
 | CI/CD | GitHub Actions | — |

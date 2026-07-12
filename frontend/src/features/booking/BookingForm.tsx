@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { CheckCircle2, Loader2 } from "lucide-react";
@@ -30,7 +30,7 @@ import { createBookingAction } from "@/app/(public)/book/actions";
 export interface BookingHotel {
   slug: string;
   name: string;
-  roomTypes: { id: string; name: string; baseRate: number }[];
+  roomTypes: { id: string; name: string; baseRate: number; maxOccupancy?: number }[];
 }
 
 const schema = z
@@ -62,12 +62,16 @@ export function BookingForm({
 }) {
   const [pending, startTransition] = useTransition();
   const [reference, setReference] = useState<string | null>(null);
+  const initialHotelRecord = hotels.find((hotel) => hotel.slug === initialHotel);
+  const validInitialRoomType = initialHotelRecord?.roomTypes.some(
+    (roomType) => roomType.id === initialRoomType,
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      hotelSlug: initialHotel ?? "",
-      roomTypeId: initialRoomType ?? "",
+      hotelSlug: initialHotelRecord?.slug ?? "",
+      roomTypeId: validInitialRoomType ? (initialRoomType ?? "") : "",
       checkIn: "",
       checkOut: "",
       guests: 2,
@@ -77,8 +81,14 @@ export function BookingForm({
     },
   });
 
-  const selectedHotel = hotels.find((h) => h.slug === form.watch("hotelSlug"));
+  const selectedHotelSlug = useWatch({ control: form.control, name: "hotelSlug" });
+  const selectedHotel = hotels.find((h) => h.slug === selectedHotelSlug);
   const roomTypes = selectedHotel?.roomTypes ?? [];
+  const selectedRoomTypeId = useWatch({ control: form.control, name: "roomTypeId" });
+  const selectedRoomType = roomTypes.find(
+    (roomType) => roomType.id === selectedRoomTypeId,
+  );
+  const minimumDate = new Date().toISOString().slice(0, 10);
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
@@ -95,7 +105,11 @@ export function BookingForm({
   if (reference) {
     return (
       <Card>
-        <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+        <CardContent
+          role="status"
+          aria-live="polite"
+          className="flex flex-col items-center gap-3 p-6 text-center sm:p-10"
+        >
           <CheckCircle2 className="h-12 w-12 text-success" />
           <h2 className="text-xl font-semibold">Request received</h2>
           <p className="max-w-sm text-sm text-muted-foreground">
@@ -175,7 +189,7 @@ export function BookingForm({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="checkIn"
@@ -183,7 +197,7 @@ export function BookingForm({
                   <FormItem>
                     <FormLabel>Check-in</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" min={minimumDate} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -196,7 +210,7 @@ export function BookingForm({
                   <FormItem>
                     <FormLabel>Check-out</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" min={minimumDate} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -211,9 +225,19 @@ export function BookingForm({
                 <FormItem>
                   <FormLabel>Guests</FormLabel>
                   <FormControl>
-                    <Input type="number" min={1} max={20} {...field} />
+                    <Input
+                      type="number"
+                      min={1}
+                      max={selectedRoomType?.maxOccupancy ?? 20}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
+                  {selectedRoomType?.maxOccupancy && (
+                    <p className="text-xs text-muted-foreground">
+                      Maximum occupancy: {selectedRoomType.maxOccupancy}
+                    </p>
+                  )}
                 </FormItem>
               )}
             />
@@ -232,7 +256,7 @@ export function BookingForm({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="email"
@@ -261,9 +285,14 @@ export function BookingForm({
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={pending}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={pending}
+              aria-busy={pending}
+            >
               {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Request booking
+              {pending ? "Sending request..." : "Request booking"}
             </Button>
           </form>
         </Form>

@@ -15,6 +15,8 @@ import {
   ClipboardList,
   Wrench,
   Utensils,
+  Inbox,
+  MessageSquareText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +44,7 @@ export const navSections: NavSection[] = [
     title: "Operations",
     items: [
       { href: "/dashboard/reservations", label: "Reservations", icon: CalendarCheck },
+      { href: "/dashboard/booking-enquiries", label: "Booking Enquiries", icon: Inbox },
       { href: "/dashboard/room-rack", label: "Room Rack", icon: CalendarDays },
       { href: "/dashboard/rooms", label: "Rooms", icon: BedDouble },
       { href: "/dashboard/room-types", label: "Room Types", icon: LayoutGrid },
@@ -52,6 +55,7 @@ export const navSections: NavSection[] = [
       { href: "/dashboard/maintenance", label: "Maintenance", icon: Wrench },
       { href: "/dashboard/invoices", label: "Invoices", icon: ReceiptText },
       { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
+      { href: "/dashboard/feedback", label: "Guest Feedback", icon: MessageSquareText },
     ],
   },
   {

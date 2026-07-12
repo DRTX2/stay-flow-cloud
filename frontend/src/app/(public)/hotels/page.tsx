@@ -18,7 +18,11 @@ export default async function HotelsPage() {
   const hotels = await getHotels();
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="mx-auto max-w-7xl px-4 py-12 sm:px-6"
+    >
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Find your stay</h1>
         <p className="mt-1 text-muted-foreground">
