@@ -220,13 +220,21 @@ jobs:
         with:
           inlineScript: |
             owner="${GITHUB_REPOSITORY_OWNER,,}"
-            az containerapp job registry set \
-              --resource-group "$RESOURCE_GROUP" \
-              --name "$ENVIRONMENT_NAME-migrations" \
-              --server "$IMAGE_REGISTRY" \
-              --username "${{ vars.GHCR_USERNAME }}" \
-              --password "${{ secrets.GHCR_READ_TOKEN }}" \
-              --output none
+            if [ "$GHCR_AUTH_ENABLED" = "true" ]; then
+              az containerapp job registry set \
+                --resource-group "$RESOURCE_GROUP" \
+                --name "$ENVIRONMENT_NAME-migrations" \
+                --server "$IMAGE_REGISTRY" \
+                --username "${{ vars.GHCR_USERNAME }}" \
+                --password "${{ secrets.GHCR_READ_TOKEN }}" \
+                --output none
+            else
+              az containerapp job registry remove \
+                --resource-group "$RESOURCE_GROUP" \
+                --name "$ENVIRONMENT_NAME-migrations" \
+                --server "$IMAGE_REGISTRY" \
+                --output none || true
+            fi
             az containerapp job update \
               --resource-group "$RESOURCE_GROUP" \
               --name "$ENVIRONMENT_NAME-migrations" \
