@@ -127,12 +127,24 @@ jobs:
         run: npm audit --audit-level=high
         working-directory: frontend
 
-      - name: Trivy secret and IaC scan (blocking)
+      - name: Trivy secret scan (blocking)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
-          scanners: secret,misconfig
+          scanners: secret
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+      # Azure Bicep is the active production path. The AWS Terraform reference remains visible
+      # in the all-repository SARIF scan, but does not block an unrelated Azure release.
+      - name: Trivy production IaC scan (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: deploy/azure
+          scanners: misconfig
           format: table
           severity: CRITICAL,HIGH
           exit-code: '1'
