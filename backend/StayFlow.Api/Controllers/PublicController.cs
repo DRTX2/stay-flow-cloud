@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using StayFlow.Application.Features.BookingEnquiries;
 using StayFlow.Application.Features.Feedback;
+using StayFlow.Application.Features.PublicCatalog;
 
 namespace StayFlow.Api.Controllers;
 
@@ -22,6 +23,19 @@ public sealed class PublicController(ISender sender) : ControllerBase
     [HttpGet("hotels")]
     public async Task<ActionResult<IReadOnlyList<PublicHotelDto>>> GetHotels()
         => Ok(await sender.Send(new GetPublicHotelsQuery()));
+
+    [HttpGet("hotels/{slug}")]
+    public async Task<ActionResult<PublicHotelDto>> GetHotel(string slug)
+        => Ok(await sender.Send(new GetPublicHotelQuery(slug)));
+
+    [HttpGet("hotels/{slug}/availability")]
+    public async Task<ActionResult<PublicAvailabilityDto>> GetAvailability(
+        string slug,
+        [FromQuery] Guid roomTypeId,
+        [FromQuery] DateOnly checkIn,
+        [FromQuery] DateOnly checkOut,
+        [FromQuery] int guests = 1)
+        => Ok(await sender.Send(new GetPublicAvailabilityQuery(slug, roomTypeId, checkIn, checkOut, guests)));
 
     [HttpPost("feedback")]
     [EnableRateLimiting("auth")]

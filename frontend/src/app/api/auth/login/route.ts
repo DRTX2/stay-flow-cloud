@@ -6,7 +6,7 @@ import { SESSION, baseCookieOptions } from "@/server/auth/cookies";
 /** Only allow same-site relative redirect targets (no open redirects). */
 function safeReturnTo(value: string | null): string {
   if (value && value.startsWith("/") && !value.startsWith("//")) return value;
-  return "/dashboard";
+  return "/";
 }
 
 /**

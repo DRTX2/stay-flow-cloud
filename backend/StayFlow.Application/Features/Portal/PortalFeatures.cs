@@ -14,9 +14,9 @@ public sealed class GetMyReservationsHandler(IApplicationDbContext dbContext, IC
 {
     public async Task<IReadOnlyList<ReservationDto>> Handle(GetMyReservationsQuery request, CancellationToken cancellationToken)
     {
-        var email = RequireEmail(currentUser);
+        var guestId = RequireGuestId(currentUser);
         return await dbContext.Reservations.AsNoTracking()
-            .Join(dbContext.Guests.Where(guest => guest.Email == email), reservation => reservation.GuestId, guest => guest.Id, (reservation, guest) => reservation)
+            .Where(reservation => reservation.GuestId == guestId)
             .OrderByDescending(reservation => reservation.Period.CheckIn)
             .Select(reservation => new ReservationDto(
                 reservation.Id,
@@ -31,13 +31,13 @@ public sealed class GetMyReservationsHandler(IApplicationDbContext dbContext, IC
             .ToListAsync(cancellationToken);
     }
 
-    internal static string RequireEmail(ICurrentUser currentUser)
+    internal static Guid RequireGuestId(ICurrentUser currentUser)
     {
-        if (!currentUser.IsAuthenticated || string.IsNullOrWhiteSpace(currentUser.UserName) || !currentUser.UserName.Contains('@', StringComparison.Ordinal))
+        if (!currentUser.IsAuthenticated || currentUser.GuestId is not { } guestId)
         {
-            throw new Domain.Common.DomainException("The authenticated account has no verified guest email.");
+            throw new Domain.Common.DomainException("This account has not claimed a guest profile.");
         }
-        return currentUser.UserName.Trim().ToLowerInvariant();
+        return guestId;
     }
 }
 
@@ -48,9 +48,9 @@ public sealed class GetMyProfileHandler(IApplicationDbContext dbContext, ICurren
 {
     public async Task<GuestDto> Handle(GetMyProfileQuery request, CancellationToken cancellationToken)
     {
-        var email = GetMyReservationsHandler.RequireEmail(currentUser);
-        var guest = await dbContext.Guests.AsNoTracking().SingleOrDefaultAsync(item => item.Email == email, cancellationToken)
-            ?? throw new NotFoundException("Guest profile", email);
+        var guestId = GetMyReservationsHandler.RequireGuestId(currentUser);
+        var guest = await dbContext.Guests.AsNoTracking().SingleOrDefaultAsync(item => item.Id == guestId, cancellationToken)
+            ?? throw new NotFoundException("Guest profile", guestId);
         return new GuestDto(guest.Id, guest.FirstName, guest.LastName, guest.Email, guest.Phone, guest.DocumentNumber);
     }
 }
@@ -62,10 +62,10 @@ public sealed class UpdateMyProfileHandler(IApplicationDbContext dbContext, ICur
 {
     public async Task<GuestDto> Handle(UpdateMyProfileCommand request, CancellationToken cancellationToken)
     {
-        var email = GetMyReservationsHandler.RequireEmail(currentUser);
-        var guest = await dbContext.Guests.SingleOrDefaultAsync(item => item.Email == email, cancellationToken)
-            ?? throw new NotFoundException("Guest profile", email);
-        guest.UpdateProfile(request.FirstName, request.LastName, email, request.Phone, request.DocumentNumber);
+        var guestId = GetMyReservationsHandler.RequireGuestId(currentUser);
+        var guest = await dbContext.Guests.SingleOrDefaultAsync(item => item.Id == guestId, cancellationToken)
+            ?? throw new NotFoundException("Guest profile", guestId);
+        guest.UpdateProfile(request.FirstName, request.LastName, guest.Email, request.Phone, request.DocumentNumber);
         await dbContext.SaveChangesAsync(cancellationToken);
         return new GuestDto(guest.Id, guest.FirstName, guest.LastName, guest.Email, guest.Phone, guest.DocumentNumber);
     }

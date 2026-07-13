@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using OpenIddict.Abstractions;
 using OpenIddict.Validation.AspNetCore;
 using StayFlow.Application.Common.Abstractions;
@@ -9,6 +11,7 @@ using StayFlow.Application.Common.Authorization;
 using StayFlow.Application.Common.Notifications;
 using StayFlow.Infrastructure.Identity;
 using StayFlow.Infrastructure.Notifications;
+using StayFlow.Infrastructure.Observability;
 using StayFlow.Infrastructure.Tenancy;
 using StayFlow.Infrastructure.Time;
 using StayFlow.Persistence;
@@ -36,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<IFeatureService, FeatureService>();
         services.AddScoped<IStaffAdministrationService, StaffAdministrationService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+        services.AddSingleton<StayFlowMetrics>();
         services.AddSingleton<INotificationService, LoggingNotificationService>();
         services.AddSingleton<DataSeeder>();
 
@@ -56,7 +60,7 @@ public static class DependencyInjection
             .AddDefaultTokenProviders();
 
         AddOpenIddict(services, configuration, isDevelopment);
-        AddAuthenticationAndAuthorization(services, configuration);
+        AddAuthenticationAndAuthorization(services, configuration, isDevelopment);
 
         return services;
     }
@@ -98,9 +102,6 @@ public static class DependencyInjection
                     OpenIddictConstants.Scopes.Roles,
                     OpenIddictConstants.Scopes.OfflineAccess);
 
-                // Development: use ephemeral keys (no cert store required, tokens invalidate on restart).
-                // Production: replace with persisted X.509 certificates loaded from Key Vault or
-                // the ASP.NET Data Protection key ring. Never use ephemeral keys in production.
                 if (isDevelopment)
                 {
                     options.AddEphemeralEncryptionKey()
@@ -108,13 +109,9 @@ public static class DependencyInjection
                 }
                 else
                 {
-                    // In production, inject signing/encryption certificates via:
-                    // options.AddSigningCertificate(certificate)
-                    // options.AddEncryptionCertificate(certificate)
-                    // Certificates should be loaded from Key Vault or environment-mounted secrets.
-                    options.AddEphemeralEncryptionKey()
-                        .AddEphemeralSigningKey();
-                    // TODO: Replace with real X.509 certificates before going live.
+                    var certificate = LoadOpenIddictCertificate(configuration);
+                    options.AddSigningCertificate(certificate)
+                        .AddEncryptionCertificate(certificate);
                 }
 
                 // Issue plain JWT access tokens so external API clients and Swagger can read them.
@@ -128,7 +125,10 @@ public static class DependencyInjection
 
                 // Local development is served over plain HTTP; allow the token endpoint to accept it.
                 // Production terminates TLS (at the edge or Kestrel) so this stays on by default there.
-                aspNetCore.DisableTransportSecurityRequirement();
+                if (isDevelopment)
+                {
+                    aspNetCore.DisableTransportSecurityRequirement();
+                }
             })
             .AddValidation(options =>
             {
@@ -137,7 +137,39 @@ public static class DependencyInjection
             });
     }
 
-    private static void AddAuthenticationAndAuthorization(IServiceCollection services, IConfiguration? configuration)
+    internal static X509Certificate2 LoadOpenIddictCertificate(IConfiguration? configuration)
+    {
+        var encodedPfx = configuration?["Authentication:OpenIddict:CertificatePfxBase64"];
+        var password = configuration?["Authentication:OpenIddict:CertificatePassword"];
+        if (string.IsNullOrWhiteSpace(encodedPfx) || string.IsNullOrWhiteSpace(password))
+        {
+            throw new InvalidOperationException(
+                "Production requires Authentication:OpenIddict:CertificatePfxBase64 and CertificatePassword.");
+        }
+
+        X509Certificate2 certificate;
+        try
+        {
+            certificate = X509CertificateLoader.LoadPkcs12(
+                Convert.FromBase64String(encodedPfx), password,
+                X509KeyStorageFlags.EphemeralKeySet);
+        }
+        catch (Exception exception) when (exception is FormatException or CryptographicException)
+        {
+            throw new InvalidOperationException("The configured OpenIddict PFX could not be loaded.", exception);
+        }
+
+        if (!certificate.HasPrivateKey)
+        {
+            throw new InvalidOperationException("The configured OpenIddict certificate has no private key.");
+        }
+        return certificate;
+    }
+
+    private static void AddAuthenticationAndAuthorization(
+        IServiceCollection services,
+        IConfiguration? configuration,
+        bool isDevelopment)
     {
         // API calls authenticate with bearer tokens (OpenIddict validation) by default; the
         // interactive Authorization Code flow uses Identity's application cookie for the logged-in
@@ -161,7 +193,9 @@ public static class DependencyInjection
             options.Cookie.Name = "StayFlow.Identity";
             options.Cookie.HttpOnly = true;
             options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
-            options.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest;
+            options.Cookie.SecurePolicy = isDevelopment
+                ? Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest
+                : Microsoft.AspNetCore.Http.CookieSecurePolicy.Always;
             options.ExpireTimeSpan = TimeSpan.FromHours(1);
             options.Events.OnRedirectToLogin = context =>
             {

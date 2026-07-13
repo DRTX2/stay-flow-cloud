@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { ShieldCheck, Users } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,6 +10,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ActionForm, ActionSubmit } from "@/components/shared/ActionForm";
 import { getJson } from "@/server/api";
 import type { StaffUsersResponse } from "@/types/api";
 import { createStaffUserAction, updateStaffRolesAction } from "./actions";
@@ -43,32 +44,52 @@ export default async function StaffPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form
+          <ActionForm
             action={createStaffUserAction}
-            className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"
+            className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-end"
           >
-            <Input name="fullName" placeholder="Full name" required />
-            <Input name="email" type="email" placeholder="email@hotel.com" required />
-            <Input
-              name="password"
-              type="password"
-              placeholder="Temporary password"
-              minLength={8}
-              required
-            />
-            <select
-              name="roles"
-              className="h-9 rounded-md border bg-background px-3 text-sm"
-              defaultValue="FrontDesk"
-            >
-              {assignableRoles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-            <Button type="submit">Create</Button>
-          </form>
+            <div className="space-y-2">
+              <Label htmlFor="staff-name">Full name</Label>
+              <Input id="staff-name" name="fullName" autoComplete="name" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="staff-email">Email</Label>
+              <Input
+                id="staff-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="staff-password">Temporary password</Label>
+              <Input
+                id="staff-password"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="staff-role">Role</Label>
+              <select
+                id="staff-role"
+                name="roles"
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                defaultValue="FrontDesk"
+              >
+                {assignableRoles.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <ActionSubmit pendingLabel="Creating…">Create</ActionSubmit>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -110,12 +131,16 @@ export default async function StaffPage() {
                     ))}
                   </div>
                 </div>
-                <form
+                <ActionForm
                   action={updateStaffRolesAction}
                   className="flex flex-wrap items-center gap-2"
                 >
                   <input type="hidden" name="id" value={user.id} />
+                  <Label htmlFor={`staff-role-${user.id}`} className="sr-only">
+                    Role for {user.fullName || user.email}
+                  </Label>
                   <select
+                    id={`staff-role-${user.id}`}
                     name="roles"
                     className="h-9 rounded-md border bg-background px-3 text-sm"
                     defaultValue={(user.roles ?? ["FrontDesk"])[0]}
@@ -126,10 +151,10 @@ export default async function StaffPage() {
                       </option>
                     ))}
                   </select>
-                  <Button type="submit" size="sm" variant="outline">
+                  <ActionSubmit pendingLabel="Updating…" size="sm" variant="outline">
                     Update role
-                  </Button>
-                </form>
+                  </ActionSubmit>
+                </ActionForm>
               </div>
             ))
           )}

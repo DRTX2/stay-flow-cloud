@@ -8,7 +8,7 @@ This folder contains the Azure baseline used by GitHub Actions. It targets Azure
 |---|---|
 | Containers | Azure Container Apps, consumption plan |
 | Registry | GitHub Container Registry (`ghcr.io`) |
-| Database | Azure Database for PostgreSQL Flexible Server, burstable B1ms |
+| Database | External Neon PostgreSQL supplied through `NEON_CONNECTION_STRING` |
 | Logs | Log Analytics workspace |
 | Identity | GitHub Actions OIDC for Azure + GHCR token for private image pulls |
 
@@ -25,6 +25,9 @@ Use `.github/workflows/deploy-azure.yml`. Required GitHub repository secrets:
 | `STAYFLOW_ADMIN_EMAIL` | Initial platform administrator email |
 | `STAYFLOW_ADMIN_PASSWORD` | Initial platform administrator password |
 | `STAYFLOW_SERVICE_CLIENT_SECRET` | Seeded service-to-service OAuth client secret |
+| `OIDC_CERTIFICATE_PFX_BASE64` | Stable base64 PKCS#12 certificate used for OpenIddict and Data Protection |
+| `OIDC_CERTIFICATE_PASSWORD` | Password protecting the PKCS#12 certificate |
+| `METRICS_BEARER_TOKEN` | Bearer token protecting the production `/metrics` endpoint |
 | `GHCR_READ_TOKEN` | GitHub token/PAT with `read:packages` for private GHCR packages |
 
 Optional social sign-in secrets (a provider stays disabled unless both values are present):
@@ -48,7 +51,7 @@ Optional GitHub repository variables:
 | `GHCR_USERNAME` | GitHub user/bot for private GHCR pulls; defaults to workflow actor |
 | `GHCR_AUTH_ENABLED` | `true`; set `false` only when GHCR packages are public |
 
-The workflow provisions Log Analytics and an Azure Container Apps environment with `main.bicep`, builds images with the correct Next.js public URLs, scans them, publishes immutable commit-SHA tags to GHCR, then deploys Container Apps with `apps.bicep`.
+The workflow validates the existing Container Apps environment, builds images with the correct Next.js public URLs, scans them, publishes immutable commit-SHA tags to GHCR, runs migrations, then deploys with `apps.bicep` and waits for the new revisions before smoke tests.
 
 To avoid Azure Container Registry charges, this baseline does not create ACR. If packages are public in GHCR, set `GHCR_AUTH_ENABLED=false`. For private packages, keep it `true` and configure `GHCR_READ_TOKEN`.
 

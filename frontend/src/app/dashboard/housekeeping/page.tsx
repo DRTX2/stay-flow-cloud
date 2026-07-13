@@ -3,7 +3,6 @@ import { ClipboardList } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,6 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ActionForm, ActionSubmit } from "@/components/shared/ActionForm";
 import { getPaged } from "@/server/api";
 import type { HousekeepingTask, Room } from "@/types/api";
 import { completeHousekeepingTaskAction, createHousekeepingTaskAction } from "./actions";
@@ -40,35 +41,50 @@ export default async function HousekeepingPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form
+          <ActionForm
             action={createHousekeepingTaskAction}
-            className="grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto]"
+            className="grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto] md:items-end"
           >
-            <select
-              name="roomId"
-              className="h-10 rounded-md border bg-background px-3 text-sm"
-              required
-            >
-              <option value="">Room</option>
-              {rooms.items.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {room.number} · {room.cleaningStatus ?? "Unknown"}
-                </option>
-              ))}
-            </select>
-            <select
-              name="taskType"
-              className="h-10 rounded-md border bg-background px-3 text-sm"
-              defaultValue="Daily Clean"
-            >
-              <option>Daily Clean</option>
-              <option>Departure Clean</option>
-              <option>Deep Clean</option>
-              <option>Turn Down Service</option>
-            </select>
-            <Input name="notes" placeholder="Notes for the attendant" />
-            <Button type="submit">Add task</Button>
-          </form>
+            <div className="space-y-2">
+              <Label htmlFor="housekeeping-room">Room</Label>
+              <select
+                id="housekeeping-room"
+                name="roomId"
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                required
+              >
+                <option value="">Select a room</option>
+                {rooms.items.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.number} · {room.cleaningStatus ?? "Unknown"}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="housekeeping-task-type">Task type</Label>
+              <select
+                id="housekeeping-task-type"
+                name="taskType"
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                defaultValue="Daily Clean"
+              >
+                <option>Daily Clean</option>
+                <option>Departure Clean</option>
+                <option>Deep Clean</option>
+                <option>Turn Down Service</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="housekeeping-notes">Notes</Label>
+              <Input
+                id="housekeeping-notes"
+                name="notes"
+                placeholder="Notes for the attendant"
+              />
+            </div>
+            <ActionSubmit pendingLabel="Adding…">Add task</ActionSubmit>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -119,12 +135,16 @@ export default async function HousekeepingPage() {
                       <Badge variant="outline">{task.status ?? "Pending"}</Badge>
                     </div>
                     {task.status !== "Completed" && (
-                      <form
+                      <ActionForm
                         action={completeHousekeepingTaskAction}
                         className="mt-3 flex flex-wrap items-center gap-2"
                       >
                         <input type="hidden" name="id" value={task.id} />
+                        <Label htmlFor={`cleaning-status-${task.id}`} className="sr-only">
+                          Final cleaning status
+                        </Label>
                         <select
+                          id={`cleaning-status-${task.id}`}
                           name="cleaningStatus"
                           className="h-9 rounded-md border bg-background px-3 text-sm"
                           defaultValue="Inspected"
@@ -132,10 +152,10 @@ export default async function HousekeepingPage() {
                           <option>Inspected</option>
                           <option>Clean</option>
                         </select>
-                        <Button size="sm" type="submit">
+                        <ActionSubmit size="sm" pendingLabel="Completing…">
                           Complete
-                        </Button>
-                      </form>
+                        </ActionSubmit>
+                      </ActionForm>
                     )}
                   </div>
                 );

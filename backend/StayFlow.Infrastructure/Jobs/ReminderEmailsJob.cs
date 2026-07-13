@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Application.Common.Notifications;
 using StayFlow.Domain.Reservations;
+using StayFlow.Infrastructure.Observability;
 using StayFlow.Persistence;
 
 namespace StayFlow.Infrastructure.Jobs;
@@ -16,10 +17,12 @@ public sealed class ReminderEmailsJob(
     StayFlowDbContext dbContext,
     IDateTimeProvider clock,
     INotificationService notifications,
+    StayFlowMetrics metrics,
     ILogger<ReminderEmailsJob> logger)
 {
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        using var measurement = metrics.MeasureJob("reminder_emails");
         var tomorrow = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime).AddDays(1);
 
         var arrivals = await dbContext.Reservations
@@ -46,5 +49,6 @@ public sealed class ReminderEmailsJob(
         }
 
         logger.LogInformation("Check-in reminders: sent {Count} for {Date}", arrivals.Count, tomorrow);
+        measurement.Succeed();
     }
 }

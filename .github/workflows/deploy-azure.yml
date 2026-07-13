@@ -195,6 +195,9 @@ jobs:
       WEB_URL: ${{ vars.AZURE_WEB_URL }}
       GHCR_AUTH_ENABLED: ${{ vars.GHCR_AUTH_ENABLED || 'true' }}
       GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+      OIDC_CERTIFICATE_PFX_BASE64: ${{ secrets.OIDC_CERTIFICATE_PFX_BASE64 }}
+      OIDC_CERTIFICATE_PASSWORD: ${{ secrets.OIDC_CERTIFICATE_PASSWORD }}
+      METRICS_BEARER_TOKEN: ${{ secrets.METRICS_BEARER_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -235,10 +238,20 @@ jobs:
                 --server "$IMAGE_REGISTRY" \
                 --output none || true
             fi
+            az containerapp job secret set \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$ENVIRONMENT_NAME-migrations" \
+              --secrets \
+                "oidc-certificate-pfx=$OIDC_CERTIFICATE_PFX_BASE64" \
+                "oidc-certificate-password=$OIDC_CERTIFICATE_PASSWORD" \
+              --output none
             az containerapp job update \
               --resource-group "$RESOURCE_GROUP" \
               --name "$ENVIRONMENT_NAME-migrations" \
               --image "$IMAGE_REGISTRY/$owner/stayflow-migrations:${{ env.IMAGE_TAG }}" \
+              --set-env-vars \
+                Authentication__OpenIddict__CertificatePfxBase64=secretref:oidc-certificate-pfx \
+                Authentication__OpenIddict__CertificatePassword=secretref:oidc-certificate-password \
               --output none
 
       - name: Run migrations and seed before application rollout
@@ -306,6 +319,9 @@ jobs:
               --parameters adminEmail="$STAYFLOW_ADMIN_EMAIL" \
               --parameters adminPassword="$STAYFLOW_ADMIN_PASSWORD" \
               --parameters serviceClientSecret="$STAYFLOW_SERVICE_CLIENT_SECRET" \
+              --parameters oidcCertificatePfxBase64="$OIDC_CERTIFICATE_PFX_BASE64" \
+              --parameters oidcCertificatePassword="$OIDC_CERTIFICATE_PASSWORD" \
+              --parameters metricsBearerToken="$METRICS_BEARER_TOKEN" \
               --parameters googleClientId="$GOOGLE_OAUTH_CLIENT_ID" \
               --parameters googleClientSecret="$GOOGLE_OAUTH_CLIENT_SECRET" \
               --parameters microsoftClientId="$MICROSOFT_OAUTH_CLIENT_ID" \

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using StayFlow.Application.Common.Abstractions;
 using StayFlow.Infrastructure;
 using StayFlow.Infrastructure.Identity;
 using StayFlow.Persistence;
@@ -308,6 +309,8 @@ static IHost CreateHost(string[] args)
                 });
                 options.UseOpenIddict();
             });
+            services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<StayFlowDbContext>());
+            services.AddRouting();
 
             // Register Infrastructure services needed by DataSeeder (Identity, OpenIddict).
             services.AddInfrastructure(

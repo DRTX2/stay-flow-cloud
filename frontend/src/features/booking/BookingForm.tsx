@@ -25,8 +25,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { money } from "@/lib/format";
-import { createBookingAction } from "@/app/(public)/book/actions";
+import {
+  checkAvailabilityAction,
+  createBookingAction,
+} from "@/app/(public)/book/actions";
 import type { Locale } from "@/i18n/config";
+import type { PublicAvailability } from "@/types/api";
 
 export interface BookingHotel {
   slug: string;
@@ -80,7 +84,9 @@ export function BookingForm({
   locale: Locale;
 }) {
   const [pending, startTransition] = useTransition();
+  const [checking, startAvailabilityTransition] = useTransition();
   const [reference, setReference] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<PublicAvailability | null>(null);
   const initialHotelRecord = hotels.find((hotel) => hotel.slug === initialHotel);
   const validInitialRoomType = initialHotelRecord?.roomTypes.some(
     (roomType) => roomType.id === initialRoomType,
@@ -111,6 +117,20 @@ export function BookingForm({
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
+      const checked = await checkAvailabilityAction(values);
+      if (
+        !checked.ok ||
+        !checked.availability ||
+        checked.availability.availableRoomCount < 1
+      ) {
+        setAvailability(checked.availability ?? null);
+        toast.error(
+          locale === "es"
+            ? "No hay habitaciones disponibles para esas fechas."
+            : "No rooms are available for those dates.",
+        );
+        return;
+      }
       const result = await createBookingAction(values);
       if (result.ok) {
         setReference(result.reference ?? "received");
@@ -125,6 +145,30 @@ export function BookingForm({
               : "Could not submit your booking"),
         );
       }
+    });
+  }
+
+  async function checkAvailability() {
+    const values = form.getValues();
+    const valid = await form.trigger([
+      "hotelSlug",
+      "roomTypeId",
+      "checkIn",
+      "checkOut",
+      "guests",
+    ]);
+    if (
+      !valid ||
+      !values.hotelSlug ||
+      !values.roomTypeId ||
+      !values.checkIn ||
+      !values.checkOut
+    )
+      return;
+    startAvailabilityTransition(async () => {
+      const result = await checkAvailabilityAction(values);
+      if (!result.ok) toast.error(result.error);
+      setAvailability(result.availability ?? null);
     });
   }
 
@@ -192,6 +236,51 @@ export function BookingForm({
                 </FormItem>
               )}
             />
+
+            <div className="rounded-lg border bg-muted/30 p-4" aria-live="polite">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm">
+                  {availability ? (
+                    availability.availableRoomCount > 0 ? (
+                      <>
+                        <p className="font-medium text-success">
+                          {availability.availableRoomCount}{" "}
+                          {locale === "es"
+                            ? "habitaciones disponibles"
+                            : "rooms available"}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {availability.nights} {locale === "es" ? "noches" : "nights"} ·{" "}
+                          {money(availability.estimatedTotal, availability.currency)}{" "}
+                          {locale === "es" ? "estimado" : "estimated"}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="font-medium text-destructive">
+                        {locale === "es"
+                          ? "Sin disponibilidad para estas fechas"
+                          : "No availability for these dates"}
+                      </p>
+                    )
+                  ) : (
+                    <p className="text-muted-foreground">
+                      {locale === "es"
+                        ? "Comprueba disponibilidad y precio antes de enviar."
+                        : "Check availability and price before submitting."}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={checkAvailability}
+                  disabled={checking}
+                >
+                  {checking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {locale === "es" ? "Comprobar" : "Check availability"}
+                </Button>
+              </div>
+            </div>
 
             <FormField
               control={form.control}

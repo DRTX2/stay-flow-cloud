@@ -20,7 +20,8 @@ namespace StayFlow.Api.Controllers;
 public sealed class AccountController(
     SignInManager<ApplicationUser> signInManager,
     UserManager<ApplicationUser> userManager,
-    IAuthenticationSchemeProvider schemeProvider) : ControllerBase
+    IAuthenticationSchemeProvider schemeProvider,
+    IConfiguration configuration) : ControllerBase
 {
     private static readonly string[] SupportedExternalProviders = ["Google", "Microsoft", "Facebook", "GitHub"];
 
@@ -42,8 +43,7 @@ public sealed class AccountController(
 
         if (!result.Succeeded)
         {
-            var config = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-            var loginFallback = config["Authentication:FrontendLoginUrl"] ?? "http://localhost:3000/signin";
+            var loginFallback = configuration["Authentication:FrontendLoginUrl"] ?? "http://localhost:3000/signin";
             var redirect = $"{loginFallback}?error=invalid_credentials&ReturnUrl={Uri.EscapeDataString(returnUrl ?? "/")}";
             return Redirect(redirect);
         }
@@ -90,7 +90,7 @@ public sealed class AccountController(
         var info = await signInManager.GetExternalLoginInfoAsync();
         if (info is null)
         {
-            return SafeRedirect("/");
+            return ExternalFailure("external_login_failed", returnUrl);
         }
 
         // Already linked: sign in directly.
@@ -105,7 +105,7 @@ public sealed class AccountController(
         var email = info.Principal.FindFirstValue(ClaimTypes.Email);
         if (string.IsNullOrWhiteSpace(email))
         {
-            return SafeRedirect("/");
+            return ExternalFailure("external_email_required", returnUrl);
         }
 
         var user = await userManager.FindByEmailAsync(email);
@@ -113,7 +113,7 @@ public sealed class AccountController(
         {
             // Never attach a new social identity to an existing account based only on an email
             // claim. Account linking requires an authenticated, explicit flow.
-            return SafeRedirect("/");
+            return ExternalFailure("external_account_exists", returnUrl);
         }
 
         user = new ApplicationUser
@@ -128,21 +128,21 @@ public sealed class AccountController(
         var created = await userManager.CreateAsync(user);
         if (!created.Succeeded)
         {
-            return SafeRedirect("/");
+            return ExternalFailure("external_provisioning_failed", returnUrl);
         }
 
         var roleAdded = await userManager.AddToRoleAsync(user, Roles.Customer);
         if (!roleAdded.Succeeded)
         {
             await userManager.DeleteAsync(user);
-            return SafeRedirect("/");
+            return ExternalFailure("external_provisioning_failed", returnUrl);
         }
 
         var linked = await userManager.AddLoginAsync(user, info);
         if (!linked.Succeeded)
         {
             await userManager.DeleteAsync(user);
-            return SafeRedirect("/");
+            return ExternalFailure("external_provisioning_failed", returnUrl);
         }
         await signInManager.SignInAsync(user, isPersistent: false);
         return SafeRedirect(returnUrl);
@@ -151,6 +151,17 @@ public sealed class AccountController(
     // Only ever redirect to local URLs or the configured frontend, to avoid open-redirect abuse.
     private LocalRedirectResult SafeRedirect(string? returnUrl)
         => LocalRedirect(!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/");
+
+    private RedirectResult ExternalFailure(string error, string? returnUrl)
+    {
+        var loginUrl = new Uri(configuration["Authentication:FrontendLoginUrl"] ?? "http://localhost:3000/signin");
+        var destination = new UriBuilder(loginUrl);
+        var query = System.Web.HttpUtility.ParseQueryString(loginUrl.Query);
+        query["error"] = error;
+        query["ReturnUrl"] = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
+        destination.Query = query.ToString();
+        return Redirect(destination.ToString());
+    }
 
     public sealed record ExternalProviderDto(string Scheme, string DisplayName);
 }

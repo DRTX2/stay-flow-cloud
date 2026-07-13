@@ -11,8 +11,18 @@ import { UserMenu, type UserMenuUser } from "./UserMenu";
 import { useShell } from "./shell-context";
 import { LocaleSwitcher } from "@/components/public/LocaleSwitcher";
 import type { Locale } from "@/i18n/config";
+import type { NavClaims } from "./nav";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 
-export function Topbar({ user, locale }: { user: UserMenuUser; locale: Locale }) {
+export function Topbar({
+  user,
+  locale,
+  claims,
+}: {
+  user: UserMenuUser;
+  locale: Locale;
+  claims: NavClaims;
+}) {
   const { collapsed, toggleCollapsed, setCommandOpen } = useShell();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -35,6 +45,7 @@ export function Topbar({ user, locale }: { user: UserMenuUser; locale: Locale })
           <Sidebar
             collapsed={false}
             locale={locale}
+            claims={claims}
             onNavigate={() => setMobileOpen(false)}
           />
         </SheetContent>
@@ -55,22 +66,24 @@ export function Topbar({ user, locale }: { user: UserMenuUser; locale: Locale })
         )}
       </Button>
 
-      <Breadcrumbs />
+      <Breadcrumbs locale={locale} claims={claims} />
 
       <div className="ml-auto flex items-center gap-1.5">
         <Button
           variant="outline"
           size="sm"
-          className="hidden h-8 gap-2 text-muted-foreground sm:flex"
+          className="h-8 gap-2 text-muted-foreground"
           onClick={() => setCommandOpen(true)}
+          aria-label="Search navigation"
         >
           <Search className="h-4 w-4" />
-          <span>Search…</span>
+          <span className="hidden sm:inline">Search…</span>
           <kbd className="pointer-events-none ml-2 hidden select-none rounded border bg-muted px-1.5 font-mono text-[10px] font-medium lg:inline">
             ⌘K
           </kbd>
         </Button>
         <ThemeToggle />
+        <NotificationBell />
         <LocaleSwitcher locale={locale} />
         <UserMenu user={user} />
       </div>

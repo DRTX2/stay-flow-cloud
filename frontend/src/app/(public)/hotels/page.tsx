@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { MapPin, Star } from "lucide-react";
+import { Hotel } from "lucide-react";
 import { money } from "@/lib/format";
 import { getHotels } from "@/content/hotels";
 import { getLocale } from "@/i18n/server";
@@ -53,28 +53,30 @@ export default async function HotelsPage() {
               />
             </div>
             <div className="p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <h2 className="font-semibold">{hotel.name}</h2>
-                <span className="flex items-center gap-1 text-sm">
-                  <Star className="h-3.5 w-3.5 fill-warning text-warning" />
-                  {hotel.rating}
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
+                  {hotel.propertyType}
                 </span>
               </div>
-              <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPin className="h-3.5 w-3.5" />
-                {hotel.city}, {hotel.country}
+              <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+                <Hotel className="h-3.5 w-3.5" />
+                {hotel.roomTypes?.length ?? 0}{" "}
+                {locale === "es" ? "tipos de habitación" : "room types"}
               </p>
               <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                 {hotel.description}
               </p>
-              <p className="mt-3 text-sm">
-                {locale === "es" ? "desde" : "from"}{" "}
-                <span className="font-semibold">{money(hotel.fromRate)}</span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  / {locale === "es" ? "noche" : "night"}
-                </span>
-              </p>
+              {hotel.fromRate != null && (
+                <p className="mt-3 text-sm">
+                  {locale === "es" ? "desde" : "from"}{" "}
+                  <span className="font-semibold">{money(hotel.fromRate)}</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    / {locale === "es" ? "noche" : "night"}
+                  </span>
+                </p>
+              )}
             </div>
           </Link>
         ))}

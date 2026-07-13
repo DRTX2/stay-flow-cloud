@@ -3,7 +3,6 @@ import { Wrench } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,6 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ActionForm, ActionSubmit } from "@/components/shared/ActionForm";
 import { getPaged } from "@/server/api";
 import type { Room, WorkOrder } from "@/types/api";
 import { createWorkOrderAction, resolveWorkOrderAction } from "./actions";
@@ -40,34 +41,50 @@ export default async function MaintenancePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form
+          <ActionForm
             action={createWorkOrderAction}
-            className="grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto]"
+            className="grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto] md:items-end"
           >
-            <select
-              name="roomId"
-              className="h-10 rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">No room</option>
-              {rooms.items.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {room.number} · {room.status ?? "Unknown"}
-                </option>
-              ))}
-            </select>
-            <select
-              name="priority"
-              className="h-10 rounded-md border bg-background px-3 text-sm"
-              defaultValue="Medium"
-            >
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-              <option>Urgent</option>
-            </select>
-            <Input name="description" placeholder="Describe the issue" required />
-            <Button type="submit">Open</Button>
-          </form>
+            <div className="space-y-2">
+              <Label htmlFor="maintenance-room">Room</Label>
+              <select
+                id="maintenance-room"
+                name="roomId"
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">Property-level</option>
+                {rooms.items.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.number} · {room.status ?? "Unknown"}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="maintenance-priority">Priority</Label>
+              <select
+                id="maintenance-priority"
+                name="priority"
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                defaultValue="Medium"
+              >
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+                <option>Urgent</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="maintenance-description">Issue</Label>
+              <Input
+                id="maintenance-description"
+                name="description"
+                placeholder="Describe the issue"
+                required
+              />
+            </div>
+            <ActionSubmit pendingLabel="Opening…">Open</ActionSubmit>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -126,20 +143,27 @@ export default async function MaintenancePage() {
                     </div>
                     {workOrder.status !== "Resolved" &&
                       workOrder.status !== "Cancelled" && (
-                        <form
+                        <ActionForm
                           action={resolveWorkOrderAction}
                           className="mt-3 flex flex-wrap items-center gap-2"
                         >
                           <input type="hidden" name="id" value={workOrder.id} />
+                          <Label
+                            htmlFor={`resolution-notes-${workOrder.id}`}
+                            className="sr-only"
+                          >
+                            Resolution notes
+                          </Label>
                           <Input
+                            id={`resolution-notes-${workOrder.id}`}
                             name="notes"
                             placeholder="Resolution notes"
                             className="max-w-xs"
                           />
-                          <Button size="sm" type="submit">
+                          <ActionSubmit size="sm" pendingLabel="Resolving…">
                             Resolve
-                          </Button>
-                        </form>
+                          </ActionSubmit>
+                        </ActionForm>
                       )}
                   </div>
                 );

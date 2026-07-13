@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Contracts;
+using StayFlow.Infrastructure.Observability;
 using StayFlow.Persistence;
 
 namespace StayFlow.Infrastructure.Messaging;
@@ -20,14 +21,15 @@ public sealed class OutboxProcessor(
     IServiceScopeFactory scopeFactory,
     IBus bus,
     IDateTimeProvider clock,
+    StayFlowMetrics metrics,
     ILogger<OutboxProcessor> logger) : BackgroundService
 {
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(10);
-    private const int BatchSize = 50;
+    private static readonly TimeSpan _pollInterval = TimeSpan.FromSeconds(10);
+    private const int _batchSize = 50;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(PollInterval);
+        using var timer = new PeriodicTimer(_pollInterval);
 
         try
         {
@@ -49,10 +51,18 @@ public sealed class OutboxProcessor(
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<StayFlowDbContext>();
 
+        var pending = await dbContext.OutboxMessages
+            .Where(message => message.ProcessedOnUtc == null)
+            .Select(message => (DateTimeOffset?)message.OccurredOnUtc)
+            .MinAsync(cancellationToken);
+        var pendingCount = await dbContext.OutboxMessages
+            .LongCountAsync(message => message.ProcessedOnUtc == null, cancellationToken);
+        metrics.ObserveOutbox(pendingCount, pending is null ? TimeSpan.Zero : clock.UtcNow - pending.Value);
+
         var messages = await dbContext.OutboxMessages
             .Where(message => message.ProcessedOnUtc == null)
             .OrderBy(message => message.OccurredOnUtc)
-            .Take(BatchSize)
+            .Take(_batchSize)
             .ToListAsync(cancellationToken);
 
         if (messages.Count == 0)
@@ -76,12 +86,14 @@ public sealed class OutboxProcessor(
 
                 message.ProcessedOnUtc = clock.UtcNow;
                 message.Error = null;
+                metrics.RecordOutboxPublish(succeeded: true);
             }
             catch (Exception ex)
             {
                 message.Attempts++;
                 message.Error = ex.Message;
                 logger.LogError(ex, "Failed to relay outbox message {MessageId}", message.Id);
+                metrics.RecordOutboxPublish(succeeded: false);
             }
         }
 

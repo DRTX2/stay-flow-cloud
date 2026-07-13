@@ -11,6 +11,7 @@ using StayFlow.Application.Pricing;
 using StayFlow.Domain.BookingEnquiries;
 using StayFlow.Domain.Guests;
 using StayFlow.Domain.Reservations;
+using StayFlow.Domain.Rooms;
 using ValidationException = StayFlow.Application.Common.Exceptions.ValidationException;
 
 namespace StayFlow.Application.Features.BookingEnquiries;
@@ -42,35 +43,6 @@ public sealed record CreateBookingEnquiryCommand(
     string? Phone) : IRequest<BookingEnquiryReceipt>;
 
 public sealed record BookingEnquiryReceipt(string Reference, string Status);
-
-public sealed record PublicRoomTypeDto(Guid Id, string Name, decimal BaseRate, int MaxOccupancy);
-public sealed record PublicHotelDto(string Slug, string Name, IReadOnlyList<PublicRoomTypeDto> RoomTypes);
-public sealed record GetPublicHotelsQuery : IRequest<IReadOnlyList<PublicHotelDto>>;
-
-public sealed class GetPublicHotelsHandler(IApplicationDbContext dbContext)
-    : IRequestHandler<GetPublicHotelsQuery, IReadOnlyList<PublicHotelDto>>
-{
-    public async Task<IReadOnlyList<PublicHotelDto>> Handle(GetPublicHotelsQuery request, CancellationToken cancellationToken)
-    {
-        var tenants = await dbContext.Tenants.AsNoTracking()
-            .Where(tenant => tenant.IsActive)
-            .OrderBy(tenant => tenant.Name)
-            .ToListAsync(cancellationToken);
-        var tenantIds = tenants.Select(tenant => tenant.Id).ToArray();
-        var roomTypes = await dbContext.RoomTypes.IgnoreQueryFilters().AsNoTracking()
-            .Where(roomType => tenantIds.Contains(roomType.TenantId) && !roomType.IsDeleted)
-            .OrderBy(roomType => roomType.Name)
-            .Select(roomType => new { roomType.TenantId, roomType.Id, roomType.Name, roomType.BaseRate, roomType.MaxOccupancy })
-            .ToListAsync(cancellationToken);
-
-        return tenants.Select(tenant => new PublicHotelDto(
-            tenant.Slug,
-            tenant.Name,
-            roomTypes.Where(roomType => roomType.TenantId == tenant.Id)
-                .Select(roomType => new PublicRoomTypeDto(roomType.Id, roomType.Name, roomType.BaseRate, roomType.MaxOccupancy))
-                .ToList())).ToList();
-    }
-}
 
 public sealed class CreateBookingEnquiryValidator : AbstractValidator<CreateBookingEnquiryCommand>
 {
@@ -107,6 +79,27 @@ public sealed class CreateBookingEnquiryHandler(IApplicationDbContext dbContext)
         {
             throw new ValidationException(
                 [new ValidationFailure(nameof(request.NumberOfGuests), $"This room type holds at most {roomType.MaxOccupancy} guests.")]);
+        }
+
+        var activeStatuses = new[] { ReservationStatus.Pending, ReservationStatus.Confirmed, ReservationStatus.CheckedIn };
+        var hasAvailableRoom = await dbContext.Rooms.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(room => room.TenantId == tenant.Id
+                              && room.RoomTypeId == roomType.Id
+                              && !room.IsDeleted
+                              && room.Capacity >= request.NumberOfGuests
+                              && room.Status != RoomStatus.Maintenance
+                              && room.Status != RoomStatus.OutOfService
+                              && !dbContext.Reservations.IgnoreQueryFilters().Any(reservation =>
+                                  reservation.TenantId == tenant.Id
+                                  && reservation.RoomId == room.Id
+                                  && !reservation.IsDeleted
+                                  && activeStatuses.Contains(reservation.Status)
+                                  && reservation.Period.CheckIn < request.CheckOut
+                                  && request.CheckIn < reservation.Period.CheckOut), cancellationToken);
+        if (!hasAvailableRoom)
+        {
+            throw new ValidationException(
+                [new ValidationFailure(nameof(request.RoomTypeId), "No rooms are available for the selected dates and party size.")]);
         }
 
         var enquiry = BookingEnquiry.Create(
@@ -214,7 +207,7 @@ public sealed class ConvertBookingEnquiryHandler(IApplicationDbContext dbContext
 
         if (await ReservationAvailability.HasOverlapAsync(dbContext, room.Id, enquiry.CheckIn, enquiry.CheckOut, cancellationToken))
         {
-            throw new ValidationException([new ValidationFailure(nameof(request.RoomId), "The selected room is already booked for these dates.")]);
+            throw new ReservationConflictException();
         }
 
         var guest = await dbContext.Guests.SingleOrDefaultAsync(g => g.Email == enquiry.Email, cancellationToken);

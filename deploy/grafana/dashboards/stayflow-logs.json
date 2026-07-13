@@ -1,0 +1,32 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": ["stayflow", "logs", "traces"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "utc",
+  "title": "StayFlow Logs & Trace Correlation",
+  "uid": "stayflow-logs",
+  "panels": [
+    {
+      "id": 1,
+      "type": "logs",
+      "title": "Application logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 0 },
+      "options": { "showTime": true, "showLabels": false, "wrapLogMessage": true, "enableLogDetails": true },
+      "targets": [{ "refId": "A", "expr": "{service_name=~\"StayFlow.*\"}", "queryType": "range" }]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Error log volume",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [{ "refId": "A", "expr": "sum(count_over_time({service_name=~\"StayFlow.*\"} |~ \"Error|Fatal|ERR|FTL\" [5m]))", "queryType": "range" }]
+    }
+  ],
+  "templating": { "list": [] }
+}

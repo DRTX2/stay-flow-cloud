@@ -7,11 +7,18 @@ using StayFlow.Application.Features.Reservations.Commands;
 using StayFlow.Application.Features.Reservations.Queries;
 using StayFlow.Application.Features.Feedback;
 using StayFlow.Domain.Reservations;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.WebUtilities;
+using System.Security.Cryptography;
+using System.Text;
+using StayFlow.Application.Common.Abstractions;
+using StayFlow.Persistence;
+using StayFlow.Persistence.Identity;
 
 namespace StayFlow.Api.Controllers;
 
 [Authorize]
-public sealed class ReservationsController : ApiControllerBase
+public sealed class ReservationsController(StayFlowDbContext dbContext, ICurrentUser currentUser) : ApiControllerBase
 {
     [HttpGet]
     [Authorize(Policy = Permissions.ReservationsRead)]
@@ -83,7 +90,36 @@ public sealed class ReservationsController : ApiControllerBase
     public async Task<ActionResult<FeedbackInvitationDto>> CreateFeedbackInvitation(Guid id)
         => Ok(await Sender.Send(new CreateFeedbackInvitationCommand(id)));
 
+    [HttpPost("{id:guid}/portal-invitation")]
+    [Authorize(Policy = Permissions.ReservationsManage)]
+    public async Task<ActionResult<PortalInvitationDto>> CreatePortalInvitation(Guid id, CancellationToken cancellationToken)
+    {
+        var guestId = await dbContext.Reservations
+            .Where(reservation => reservation.Id == id)
+            .Select(reservation => (Guid?)reservation.GuestId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (guestId is null || currentUser.TenantId is not { } tenantId)
+        {
+            return NotFound();
+        }
+
+        var token = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+        var expiresAt = DateTimeOffset.UtcNow.AddHours(48);
+        dbContext.PortalGuestInvitations.Add(new PortalGuestInvitation
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            GuestId = guestId.Value,
+            TokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))),
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            ExpiresAtUtc = expiresAt,
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(new PortalInvitationDto(token, expiresAt));
+    }
+
     public sealed record CancelReservationBody(string? Reason);
 
     public sealed record AddChargeBody(Guid ServiceItemId, int Quantity = 1);
+    public sealed record PortalInvitationDto(string Token, DateTimeOffset ExpiresAtUtc);
 }

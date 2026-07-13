@@ -65,6 +65,18 @@ param adminPassword string
 param serviceClientSecret string
 
 @secure()
+@description('Base64-encoded PKCS#12 certificate with an RSA private key used to sign OpenIddict tokens. Keep stable across revisions.')
+param oidcCertificatePfxBase64 string
+
+@secure()
+@description('Password protecting the OpenIddict PKCS#12 certificate.')
+param oidcCertificatePassword string
+
+@secure()
+@description('Bearer token required to scrape the production Prometheus endpoint.')
+param metricsBearerToken string
+
+@secure()
 @description('Optional Google OAuth client id.')
 param googleClientId string = ''
 
@@ -128,6 +140,18 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'postgres-connection-string'
           value: postgresConnectionString
         }
+        {
+          name: 'oidc-certificate-pfx'
+          value: oidcCertificatePfxBase64
+        }
+        {
+          name: 'oidc-certificate-password'
+          value: oidcCertificatePassword
+        }
+        {
+          name: 'metrics-bearer-token'
+          value: metricsBearerToken
+        }
       ], registryAuthenticationEnabled ? [
         {
           name: registryPasswordSecretName
@@ -167,8 +191,24 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
               value: siteUrl
             }
             {
+              name: 'Docs__Enabled'
+              value: 'true'
+            }
+            {
+              name: 'Metrics__BearerToken'
+              secretRef: 'metrics-bearer-token'
+            }
+            {
               name: 'Authentication__Issuer'
               value: oidcAuthority
+            }
+            {
+              name: 'Authentication__OpenIddict__CertificatePfxBase64'
+              secretRef: 'oidc-certificate-pfx'
+            }
+            {
+              name: 'Authentication__OpenIddict__CertificatePassword'
+              secretRef: 'oidc-certificate-password'
             }
             {
               name: 'ConnectionStrings__Default'
@@ -257,6 +297,14 @@ resource migrationJob 'Microsoft.App/jobs@2024-03-01' = {
           name: 'service-client-secret'
           value: serviceClientSecret
         }
+        {
+          name: 'oidc-certificate-pfx'
+          value: oidcCertificatePfxBase64
+        }
+        {
+          name: 'oidc-certificate-password'
+          value: oidcCertificatePassword
+        }
       ], registryAuthenticationEnabled ? [
         {
           name: registryPasswordSecretName
@@ -300,6 +348,14 @@ resource migrationJob 'Microsoft.App/jobs@2024-03-01' = {
             {
               name: 'Authentication__Issuer'
               value: oidcAuthority
+            }
+            {
+              name: 'Authentication__OpenIddict__CertificatePfxBase64'
+              secretRef: 'oidc-certificate-pfx'
+            }
+            {
+              name: 'Authentication__OpenIddict__CertificatePassword'
+              secretRef: 'oidc-certificate-password'
             }
             {
               name: 'Authentication__SpaRedirectUris__0'

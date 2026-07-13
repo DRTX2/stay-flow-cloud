@@ -20,7 +20,7 @@ public sealed class PublicApiContractTests(ContractApiFactory factory) : IClassF
     {
         var client = factory.CreateClient();
 
-        var document = await client.GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json");
+        var document = await client.GetFromJsonAsync<JsonElement>("/openapi/v1.json");
 
         var paths = document.GetProperty("paths")
             .EnumerateObject()
@@ -33,6 +33,8 @@ public sealed class PublicApiContractTests(ContractApiFactory factory) : IClassF
             "/api/v1/Reservations",
             "/api/v1/BookingEnquiries",
             "/api/v1/public/hotels",
+            "/api/v1/public/hotels/{slug}",
+            "/api/v1/public/hotels/{slug}/availability",
             "/api/v1/public/bookings",
             "/api/v1/public/feedback",
             "/api/v1/Feedback",
@@ -57,6 +59,63 @@ public sealed class PublicApiContractTests(ContractApiFactory factory) : IClassF
                 actual => string.Equals(actual, path, StringComparison.OrdinalIgnoreCase),
                 because: "{0} is part of the published API contract", path);
         }
+    }
+
+    [Fact]
+    public async Task Docs_UseCanonicalOpenApiDocument()
+    {
+        var client = factory.CreateClient();
+
+        var documentResponse = await client.GetAsync("/openapi/v1.json");
+        var docsResponse = await client.GetAsync("/docs");
+
+        documentResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        documentResponse.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+        docsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await docsResponse.Content.ReadAsStringAsync()).Should().Contain("openapi/v1.json");
+    }
+
+    [Fact]
+    public async Task Metrics_RequireConfiguredBearerToken()
+    {
+        var client = factory.CreateClient();
+
+        (await client.GetAsync("/metrics")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "contract-metrics-token");
+        (await client.GetAsync("/metrics")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task ProblemDetails_IncludeTraceId()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync($"/api/v1/rooms/{Guid.NewGuid()}");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task OpenApiDocument_DescribesOAuthFlowsAndEndpointSecurity()
+    {
+        var document = await factory.CreateClient().GetFromJsonAsync<JsonElement>("/openapi/v1.json");
+        var oauth = document.GetProperty("components").GetProperty("securitySchemes").GetProperty("oauth2");
+
+        oauth.GetProperty("flows").TryGetProperty("authorizationCode", out _).Should().BeTrue();
+        oauth.GetProperty("flows").TryGetProperty("clientCredentials", out _).Should().BeTrue();
+
+        var paths = document.GetProperty("paths");
+        var publicOperation = paths.GetProperty("/api/v1/public/hotels").GetProperty("get");
+        publicOperation.GetProperty("security").GetArrayLength().Should().Be(0);
+
+        var protectedOperation = paths.GetProperty("/api/v1/Rooms").GetProperty("get");
+        protectedOperation.TryGetProperty("security", out var operationSecurity).Should().BeFalse(
+            "protected operations inherit the document OAuth requirement");
+        document.GetProperty("security").GetArrayLength().Should().BeGreaterThan(0);
+
+        publicOperation.GetProperty("operationId").GetString().Should().NotBeNullOrWhiteSpace();
+        publicOperation.GetProperty("tags").GetArrayLength().Should().BeGreaterThan(0);
     }
 
     [Fact]
@@ -130,6 +189,36 @@ public sealed class PublicApiContractTests(ContractApiFactory factory) : IClassF
         foreach (var property in new[] { "id", "roomId", "guestId", "checkIn", "checkOut", "numberOfGuests", "totalPrice", "confirmationCode", "status", "nights" })
         {
             reservation.TryGetProperty(property, out _).Should().BeTrue("reservation exposes {0}", property);
+        }
+    }
+
+    [Fact]
+    public async Task PublicCatalogAndAvailability_HaveContractShape()
+    {
+        var client = factory.CreateClient();
+        var hotels = await client.GetFromJsonAsync<JsonElement>("/api/v1/public/hotels");
+        var hotel = hotels[0];
+        var slug = hotel.GetProperty("slug").GetString();
+        var roomTypeId = hotel.GetProperty("roomTypes")[0].GetProperty("id").GetGuid();
+        var checkIn = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(360));
+        var checkOut = checkIn.AddDays(2);
+
+        foreach (var property in new[] { "slug", "name", "propertyType", "currency", "roomTypes" })
+        {
+            hotel.TryGetProperty(property, out _).Should().BeTrue("public hotels expose {0}", property);
+        }
+
+        var detail = await client.GetFromJsonAsync<JsonElement>($"/api/v1/public/hotels/{slug}");
+        detail.GetProperty("slug").GetString().Should().Be(slug);
+        var availability = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/public/hotels/{slug}/availability?roomTypeId={roomTypeId}&checkIn={checkIn:yyyy-MM-dd}&checkOut={checkOut:yyyy-MM-dd}&guests=1");
+        foreach (var property in new[]
+                 {
+                     "hotelSlug", "roomTypeId", "checkIn", "checkOut", "guests", "nights",
+                     "availableRoomCount", "estimatedTotal", "averageNightlyRate", "currency",
+                 })
+        {
+            availability.TryGetProperty(property, out _).Should().BeTrue("availability exposes {0}", property);
         }
     }
 

@@ -21,6 +21,8 @@
         <ProjectReference Include="..\StayFlow.Application\StayFlow.Application.csproj" />
         <ProjectReference Include="..\StayFlow.Domain\StayFlow.Domain.csproj" />
         <ProjectReference Include="..\StayFlow.Persistence\StayFlow.Persistence.csproj" />
+        <ProjectReference Include="..\StayFlow.Infrastructure\StayFlow.Infrastructure.csproj" />
+        <ProjectReference Include="..\StayFlow.NotificationService\StayFlow.NotificationService.csproj" />
     </ItemGroup>
 
     <ItemGroup>

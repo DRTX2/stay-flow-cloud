@@ -10,6 +10,9 @@ public sealed class ApplicationUser : IdentityUser<Guid>
 {
     public Guid TenantId { get; set; }
 
+    /// <summary>The explicitly claimed guest profile. Never inferred from an email address.</summary>
+    public Guid? GuestId { get; set; }
+
     public string FullName { get; set; } = string.Empty;
 
     public bool IsActive { get; set; } = true;

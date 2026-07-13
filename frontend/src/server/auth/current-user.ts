@@ -10,6 +10,7 @@ export interface CurrentUser {
   roles: string[];
   permissions: string[];
   tenantId?: string;
+  guestId?: string;
 }
 
 function toStringArray(value: unknown): string[] {
@@ -36,6 +37,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       roles: toStringArray(claims.role ?? claims.roles),
       permissions: toStringArray(claims.permission),
       tenantId: claims.tenant_id as string | undefined,
+      guestId: claims.guest_id as string | undefined,
     };
   } catch {
     return null;
@@ -46,8 +48,20 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
  * Page-level guard (defense in depth on top of the middleware): returns the user or redirects to
  * sign-in. Use at the top of authenticated server components/layouts.
  */
-export async function requireUser(): Promise<CurrentUser> {
+export async function requireUser(returnTo = "/dashboard"): Promise<CurrentUser> {
   const user = await getCurrentUser();
-  if (!user) redirect("/api/auth/login?redirect=/dashboard");
+  if (!user) redirect(`/api/auth/login?redirect=${encodeURIComponent(returnTo)}`);
+  return user;
+}
+
+export async function requirePortalUser(): Promise<CurrentUser> {
+  const user = await requireUser("/portal");
+  if (!user.roles.includes("Customer")) redirect("/dashboard");
+  return user;
+}
+
+export async function requireStaffUser(): Promise<CurrentUser> {
+  const user = await requireUser("/dashboard");
+  if (user.roles.includes("Customer")) redirect("/portal");
   return user;
 }

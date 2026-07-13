@@ -53,6 +53,26 @@ public sealed class RoomTests
     }
 
     [Fact]
+    public void OccupiedRoom_RemainsBookableForNonOverlappingFutureDates()
+    {
+        var room = Room.Create("101", Guid.NewGuid(), 90m, 2);
+
+        room.MarkOccupied();
+
+        room.IsBookable.Should().BeTrue();
+    }
+
+    [Fact]
+    public void OutOfServiceRoom_IsNotBookable()
+    {
+        var room = Room.Create("101", Guid.NewGuid(), 90m, 2);
+
+        room.MarkOutOfService();
+
+        room.IsBookable.Should().BeFalse();
+    }
+
+    [Fact]
     public void ChangePrice_Negative_Throws()
     {
         var room = Room.Create("101", Guid.NewGuid(), 90m, 2);

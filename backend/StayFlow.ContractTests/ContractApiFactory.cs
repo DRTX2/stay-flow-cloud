@@ -27,7 +27,9 @@ public sealed class ContractApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:Default", _database.GetConnectionString());
         builder.UseSetting("RateLimiting:Enabled", "false");
-        builder.UseSetting("Database:RunMigrationsOnStartup", "true");
+        builder.UseSetting("Metrics:BearerToken", "contract-metrics-token");
+        // Contract tests exercise the current model, independently of migration authoring in progress.
+        builder.UseSetting("Database:EnsureCreatedOnStartup", "true");
         builder.UseSetting("IsDevelopment", "true");
         builder.UseSetting("Seeding:AdminEmail", "admin@stayflow.local");
         builder.UseSetting("Seeding:AdminPassword", "Admin123$");

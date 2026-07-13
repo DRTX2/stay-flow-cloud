@@ -33,6 +33,15 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
         }
     }
 
+    public Guid? GuestId
+    {
+        get
+        {
+            var value = Principal?.FindFirstValue(AuthConstants.GuestClaim);
+            return Guid.TryParse(value, out var id) ? id : null;
+        }
+    }
+
     public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated ?? false;
 
     public IReadOnlySet<string> Permissions =>

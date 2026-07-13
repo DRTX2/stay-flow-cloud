@@ -17,11 +17,11 @@ graph TB
 
     subgraph "StayFlow Cloud"
         Web["Next.js 16 BFF\n(Frontend + API Routes)"]
-        API["ASP.NET Core 9 API\n(Business Logic + OIDC Server)"]
+        API["ASP.NET Core 10 API\n(Business Logic + OIDC Server)"]
     end
 
     DB[("PostgreSQL\n(Neon Serverless)")]
-    Storage["S3-Compatible\nObject Storage"]
+    Storage["Optional S3-Compatible\nObject Storage"]
     ACA["Azure Container Apps\n(Hosting)"]
 
     Guest --> Web
@@ -48,7 +48,7 @@ graph TB
         PKCEFlow["PKCE Auth Flow\n(httpOnly Cookies)"]
     end
 
-    subgraph BackendAPI["Backend — ASP.NET Core 9"]
+    subgraph BackendAPI["Backend — ASP.NET Core 10"]
         Controllers["REST Controllers"]
         subgraph Application["Application Layer"]
             Commands["Commands / Queries\n(MediatR CQRS)"]
@@ -103,11 +103,11 @@ graph LR
 
     subgraph ACA["Azure Container Apps Environment"]
         WebApp["stayflow-prod-web\n(Next.js - Port 3000)"]
-        APIApp["stayflow-prod-api\n(ASP.NET Core - Port 8080)"]
+        APIApp["stayflow-prod-api\n(ASP.NET Core 10 - Port 8080)"]
     end
 
     Neon[("Neon PostgreSQL\n(Serverless)")]
-    S3["S3-Compatible\nStorage"]
+    S3["Optional S3-Compatible\nStorage"]
     Internet["🌐 Internet"]
 
     Dev -->|git push| GH
@@ -128,7 +128,7 @@ graph LR
 - Every business entity carries a `TenantId` (GUID).
 - `ITenantProvider` extracts the current tenant from the authenticated user's JWT claims.
 - EF Core global query filters automatically scope all queries — no manual `WHERE TenantId = X` needed.
-- Tenant isolation is enforced at the database **row level**.
+- Tenant isolation is enforced through EF Core global query filters and tenant-stamped writes. PostgreSQL RLS is planned as defense in depth; it is not currently enabled globally.
 - Platform-level operations bypass tenant filtering via admin authorization policies.
 
 ---
@@ -158,13 +158,13 @@ graph LR
 | Frontend | Next.js (App Router, Turbopack) | 16.x |
 | Frontend Language | TypeScript | 5.x |
 | Frontend Styles | Tailwind CSS + shadcn/ui | — |
-| Backend Framework | ASP.NET Core | 9.0 |
-| Backend Language | C# | 13 |
-| Authentication | OpenIddict (OIDC) + ASP.NET Identity | 5.x |
+| Backend Framework | ASP.NET Core | 10.0 |
+| Backend Language | C# | 14 |
+| Authentication | OpenIddict (OIDC) + ASP.NET Identity | 7.x |
 | CQRS / Mediator | MediatR | — |
-| ORM | Entity Framework Core | 9.x |
+| ORM | Entity Framework Core | 10.x |
 | Background Jobs | Hangfire | — |
-| Event Bus | MassTransit (loopback) | — |
+| Event Bus | MassTransit (in-memory in Azure; RabbitMQ optional locally) | — |
 | Database | PostgreSQL via Neon (serverless) | 17 |
 | Object Storage | S3-Compatible | — |
 | Container Platform | Azure Container Apps | — |

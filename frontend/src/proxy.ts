@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION, writeTokenCookies } from "@/server/auth/cookies";
+import { SESSION, clearAuthCookies, writeTokenCookies } from "@/server/auth/cookies";
 import { refreshAccessToken } from "@/server/auth/oidc";
+import { decodeJwt } from "jose";
+import { authenticatedDestination } from "@/server/auth/routing";
 
 const CLOCK_SKEW_SECONDS = 30;
 
@@ -22,8 +24,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(newUrl);
   }
 
-  // Only gatekeep /dashboard routes
-  if (!request.nextUrl.pathname.startsWith("/dashboard")) {
+  const protectedArea =
+    request.nextUrl.pathname.startsWith("/dashboard") ||
+    request.nextUrl.pathname.startsWith("/portal");
+  if (!protectedArea) {
     return NextResponse.next();
   }
 
@@ -34,13 +38,13 @@ export async function proxy(request: NextRequest) {
   const now = Math.floor(Date.now() / 1000);
 
   if (access && expiry - CLOCK_SKEW_SECONDS > now) {
-    return NextResponse.next();
+    return responseForToken(request, access);
   }
 
   if (refresh) {
     try {
       const tokens = await refreshAccessToken(refresh);
-      const response = NextResponse.next();
+      const response = responseForToken(request, tokens.accessToken);
       writeTokenCookies(response.cookies, tokens);
       return response;
     } catch {
@@ -53,9 +57,27 @@ export async function proxy(request: NextRequest) {
     "redirect",
     request.nextUrl.pathname + request.nextUrl.search,
   );
-  return NextResponse.redirect(loginUrl);
+  const response = NextResponse.redirect(loginUrl);
+  clearAuthCookies(response.cookies);
+  return response;
+}
+
+function responseForToken(request: NextRequest, token: string): NextResponse {
+  try {
+    const claims = decodeJwt(token) as Record<string, unknown>;
+    const value = claims.role ?? claims.roles;
+    const roles =
+      value == null ? [] : Array.isArray(value) ? value.map(String) : [String(value)];
+    const requested = request.nextUrl.pathname + request.nextUrl.search;
+    const destination = authenticatedDestination(requested, roles);
+    return destination === requested
+      ? NextResponse.next()
+      : NextResponse.redirect(new URL(destination, request.url));
+  } catch {
+    return NextResponse.next();
+  }
 }
 
 export const config = {
-  matcher: ["/", "/login", "/signin", "/dashboard", "/dashboard/:path*"],
+  matcher: ["/dashboard", "/dashboard/:path*", "/portal", "/portal/:path*"],
 };

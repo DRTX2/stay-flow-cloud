@@ -11,19 +11,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getList } from "@/server/api";
-import { requireUser } from "@/server/auth/current-user";
+import { requirePortalUser } from "@/server/auth/current-user";
 import { ReservationCard } from "@/features/portal/ReservationCard";
 import type { Reservation } from "@/types/api";
 
 export const metadata: Metadata = { title: "Home" };
 
 export default async function PortalHomePage() {
-  const user = await requireUser();
+  const user = await requirePortalUser();
 
   let reservations: Reservation[] = [];
   let failed = false;
 
   try {
+    if (!user.guestId) throw new Error("Guest profile is not linked");
     reservations = await getList<Reservation>("/api/v1/portal/reservations");
   } catch {
     failed = true;
@@ -46,7 +47,24 @@ export default async function PortalHomePage() {
         description="Your guest portal — view reservations and manage your profile."
       />
 
-      {failed && (
+      {!user.guestId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Connect your stay</CardTitle>
+            <CardDescription>
+              Enter the one-time invitation supplied by your hotel to securely connect
+              your reservations.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/portal/link" className="font-medium underline">
+              Use a guest invitation
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {failed && user.guestId && (
         <Card>
           <CardContent className="p-6 text-sm text-destructive">
             Could not load your reservations. Please try again later.

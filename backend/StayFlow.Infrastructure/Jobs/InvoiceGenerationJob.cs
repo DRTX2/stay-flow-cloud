@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Domain.Reservations;
+using StayFlow.Infrastructure.Observability;
 using StayFlow.Persistence;
 
 namespace StayFlow.Infrastructure.Jobs;
@@ -14,10 +15,12 @@ namespace StayFlow.Infrastructure.Jobs;
 [AutomaticRetry(Attempts = 3)]
 public sealed class InvoiceGenerationJob(
     StayFlowDbContext dbContext,
+    StayFlowMetrics metrics,
     ILogger<InvoiceGenerationJob> logger)
 {
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        using var measurement = metrics.MeasureJob("invoice_generation");
         var awaitingInvoice = await dbContext.Reservations
             .IgnoreQueryFilters()
             .CountAsync(
@@ -33,5 +36,6 @@ public sealed class InvoiceGenerationJob(
             awaitingInvoice);
 
         // TODO: issue an invoice per reservation via the billing command (GenerateInvoice).
+        measurement.Succeed();
     }
 }

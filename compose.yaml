@@ -66,6 +66,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      DOTNET_ENVIRONMENT: Development
       IsDevelopment: "true"
       STAYFLOW_MIGRATOR_CONNECTION: "Host=postgres;Port=5432;Database=stayflow;Username=postgres;Password=postgres"
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=stayflow;Username=postgres;Password=postgres"
@@ -97,6 +98,7 @@ services:
       ConnectionStrings__Redis: "redis:6379"
       ConnectionStrings__Mongo: "mongodb://mongo:27017"
       ConnectionStrings__RabbitMq: "amqp://guest:guest@rabbitmq:5672"
+      OpenTelemetry__OtlpEndpoint: "http://otel-collector:4317"
     ports:
       - "8080:8080"
 
@@ -116,19 +118,89 @@ services:
     ports:
       - "8081:8080"
 
-  # Scrapes the API's /metrics endpoint exposed by the OpenTelemetry Prometheus exporter.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.128.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./deploy/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      tempo:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "--version"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  tempo:
+    image: grafana/tempo:2.8.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./deploy/tempo.yaml:/etc/tempo.yaml:ro
+      - tempodata:/var/tempo
+    ports:
+      - "3200:3200"
+    healthcheck:
+      test: ["CMD", "/tempo", "-version"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  loki:
+    image: grafana/loki:3.5.1
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./deploy/loki.yaml:/etc/loki/local-config.yaml:ro
+      - lokidata:/loki
+    ports:
+      - "3100:3100"
+    healthcheck:
+      test: ["CMD", "/usr/bin/loki", "-version"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager"]
+    volumes:
+      - ./deploy/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanagerdata:/alertmanager
+    ports:
+      - "9093:9093"
+    healthcheck:
+      test: ["CMD", "/bin/alertmanager", "--version"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Scrapes the API's /metrics endpoint and evaluates StayFlow alert rules.
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.5.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus"]
     volumes:
       - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus-rules.yml:/etc/prometheus/prometheus-rules.yml:ro
+      - prometheusdata:/prometheus
     ports:
       - "9090:9090"
     depends_on:
-      - stayflow.api
+      stayflow.api:
+        condition: service_started
+      alertmanager:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/prometheus", "--version"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   # Pre-provisioned with the Prometheus datasource and the StayFlow API dashboard.
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.0.2
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -136,10 +208,21 @@ services:
     volumes:
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
     ports:
       - "3001:3000"
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/health | grep -q ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
   # Next.js BFF (public marketing/booking + authenticated dashboard). NEXT_PUBLIC_* are baked at
   # build time (browser-facing URLs); API_INTERNAL_URL is the server-to-server address on the
@@ -164,3 +247,8 @@ services:
 volumes:
   pgdata:
   mongodata:
+  prometheusdata:
+  grafanadata:
+  tempodata:
+  lokidata:
+  alertmanagerdata:

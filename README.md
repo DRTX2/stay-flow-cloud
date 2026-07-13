@@ -83,8 +83,8 @@ behaviors for validation and logging.
 |---|---|
 | Runtime | .NET 10 / ASP.NET Core |
 | Primary DB | PostgreSQL + EF Core |
-| Audit / event store | MongoDB |
-| Cache / rate-limit / sessions | Redis (StackExchange) |
+| Audit sink | MongoDB (optional) |
+| Distributed cache / key store | Redis (optional; PostgreSQL fallback for Data Protection) |
 | AuthN/AuthZ | ASP.NET Identity + OpenIddict (OAuth2 / OIDC) |
 | Messaging | MassTransit + transactional outbox |
 | Background jobs | Hangfire (PostgreSQL storage) |
@@ -112,7 +112,7 @@ Dependencies are governed centrally via `Directory.Packages.props` (Central Pack
 - **Invoices** — billing tied to reservations and services.
 - **Services** — sellable extras attached to stays.
 - **Analytics** — dashboard summary and revenue reporting.
-- **Audit** — every domain event persisted to MongoDB for an immutable trail.
+- **Audit** — tenant audit records can be persisted to MongoDB when that optional sink is configured.
 - **Tenant Features** — per-tenant feature flags.
 - **Documents** — tenant-scoped file storage (S3/local) with cross-tenant access guards.
 
@@ -198,7 +198,8 @@ Useful local commands:
 | Service | URL |
 |---|---|
 | API | http://localhost:8080 |
-| Swagger / OpenAPI | http://localhost:8080/swagger |
+| Scalar API reference | http://localhost:8080/docs |
+| OpenAPI JSON | http://localhost:8080/openapi/v1.json |
 | Health (liveness) | http://localhost:8080/health/live |
 | Health (readiness) | http://localhost:8080/health/ready |
 | Metrics | http://localhost:8080/metrics |
@@ -242,12 +243,12 @@ defaults documented in `backend/StayFlow.Api/appsettings.Development.json`. See
 
 - **Metrics** — OpenTelemetry instruments ASP.NET Core, HTTP clients, EF Core and the runtime, and
   exposes them at `/metrics` for Prometheus to scrape (`deploy/prometheus.yml`).
-- **Dashboards** — Grafana is pre-provisioned with the Prometheus datasource and a StayFlow API
+- **Dashboards** — Grafana is pre-provisioned with Prometheus, Loki and Tempo datasources and a StayFlow API
   dashboard (request rate, p95 latency, 5xx rate, process memory) under `deploy/grafana`.
 - **Tracing** — OTLP export is wired and activates automatically when an OTLP endpoint is configured.
 - **Logging** — Serilog structured logs.
-- **Health** — `/health/live` and `/health/ready` (the latter checks PostgreSQL, Redis, MongoDB and
-  the message bus) feed Compose, Container Apps and other orchestrator health checks.
+- **Health** — `/health/live` and `/health/ready` check the process and configured dependencies
+  (PostgreSQL, Redis and MongoDB) for Compose, Container Apps and other orchestrators.
 
 ---
 

@@ -42,14 +42,14 @@ public sealed class DomainEventNotificationConsumer(ILogger<DomainEventNotificat
     /// Picks a delivery channel from the event type. Matching on a suffix keeps it decoupled from the
     /// publisher's exact namespace while still reacting to the meaningful business events.
     /// </summary>
-    private static string? ResolveChannel(string eventType) => eventType switch
+    internal static string? ResolveChannel(string eventType) => eventType switch
     {
-        var type when type.EndsWith("ReservationCreated", StringComparison.OrdinalIgnoreCase) => "Email",
-        var type when type.EndsWith("ReservationCancelled", StringComparison.OrdinalIgnoreCase) => "Email",
-        var type when type.EndsWith("ReservationCanceled", StringComparison.OrdinalIgnoreCase) => "Email",
-        var type when type.EndsWith("InvoiceGenerated", StringComparison.OrdinalIgnoreCase) => "Email",
-        var type when type.EndsWith("InvoicePaid", StringComparison.OrdinalIgnoreCase) => "Email",
-        var type when type.EndsWith("GuestRegistered", StringComparison.OrdinalIgnoreCase) => "Email",
+        var type when type.EndsWith("ReservationCreatedEvent", StringComparison.OrdinalIgnoreCase) => "Email",
+        var type when type.EndsWith("ReservationCancelledEvent", StringComparison.OrdinalIgnoreCase) => "Email",
+        var type when type.EndsWith("ReservationCanceledEvent", StringComparison.OrdinalIgnoreCase) => "Email",
+        var type when type.EndsWith("InvoiceGeneratedEvent", StringComparison.OrdinalIgnoreCase) => "Email",
+        var type when type.EndsWith("InvoicePaidEvent", StringComparison.OrdinalIgnoreCase) => "Email",
+        var type when type.EndsWith("GuestRegisteredEvent", StringComparison.OrdinalIgnoreCase) => "Email",
         _ => null,
     };
 }

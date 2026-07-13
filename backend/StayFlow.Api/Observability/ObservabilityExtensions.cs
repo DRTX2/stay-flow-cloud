@@ -4,6 +4,7 @@ using MongoDB.Driver;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using StayFlow.Infrastructure.Observability;
 using StayFlow.Persistence;
 
 namespace StayFlow.Api.Observability;
@@ -18,7 +19,7 @@ public static class ObservabilityExtensions
 {
     public const string ServiceName = "StayFlow.Api";
 
-    private static readonly string ServiceVersion =
+    private static readonly string _serviceVersion =
         typeof(ObservabilityExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0";
 
     public static IServiceCollection AddObservability(this IServiceCollection services, IConfiguration configuration)
@@ -30,7 +31,7 @@ public static class ObservabilityExtensions
         var otlpEndpoint = configuration["OpenTelemetry:OtlpEndpoint"];
 
         services.AddOpenTelemetry()
-            .ConfigureResource(resource => resource.AddService(ServiceName, serviceVersion: ServiceVersion))
+            .ConfigureResource(resource => resource.AddService(ServiceName, serviceVersion: _serviceVersion))
             .WithTracing(tracing =>
             {
                 tracing
@@ -43,7 +44,8 @@ public static class ObservabilityExtensions
                     tracing.AddOtlpExporter(options => options.Endpoint = new Uri(otlpEndpoint));
                 }
             })
-            .WithMetrics(metrics => metrics
+             .WithMetrics(metrics => metrics
+                .AddMeter(StayFlowMetrics.MeterName)
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
@@ -79,7 +81,7 @@ public static class ObservabilityExtensions
     /// </summary>
     public static WebApplication MapObservability(this WebApplication app)
     {
-        app.MapPrometheusScrapingEndpoint().DisableRateLimiting();
+        app.MapPrometheusScrapingEndpoint().DisableRateLimiting().ExcludeFromDescription();
 
         // Liveness: process is up and the host is responding. No dependency checks.
         app.MapHealthChecks("/health/live", new()

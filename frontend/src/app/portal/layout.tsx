@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
-import { requireUser } from "@/server/auth/current-user";
+import { requirePortalUser } from "@/server/auth/current-user";
 import { PortalShell } from "@/features/portal/PortalShell";
 import { getLocale } from "@/i18n/server";
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
  * sidebar and topbar designed for guest-facing interactions.
  */
 export default async function PortalLayout({ children }: { children: ReactNode }) {
-  const [user, locale] = await Promise.all([requireUser(), getLocale()]);
+  const [user, locale] = await Promise.all([requirePortalUser(), getLocale()]);
   return (
     <PortalShell
       locale={locale}

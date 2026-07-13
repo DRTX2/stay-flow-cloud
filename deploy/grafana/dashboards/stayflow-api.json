@@ -3,6 +3,8 @@
   "editable": true,
   "graphTooltip": 0,
   "schemaVersion": 39,
+  "uid": "stayflow-api-red",
+  "refresh": "15s",
   "title": "StayFlow API",
   "tags": ["stayflow"],
   "time": { "from": "now-1h", "to": "now" },
@@ -70,6 +72,66 @@
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "process_memory_working_set_bytes",
           "legendFormat": "working set"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Outbox pending",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "stayflow_outbox_pending_messages",
+          "legendFormat": "pending"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Oldest outbox message",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "stayflow_outbox_oldest_age_seconds",
+          "legendFormat": "age"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Outbox publish outcomes",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(stayflow_outbox_publish_messages_total[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Background job p95 duration",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (job, le) (rate(stayflow_job_duration_seconds_bucket[15m])))",
+          "legendFormat": "{{job}}"
         }
       ]
     }

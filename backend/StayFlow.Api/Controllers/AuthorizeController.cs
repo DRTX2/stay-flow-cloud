@@ -58,6 +58,10 @@ public sealed class AuthorizeController(
             .SetClaim(Claims.Name, user.UserName)
             .SetClaim(Claims.Email, user.Email)
             .SetClaim(AuthConstants.TenantClaim, user.TenantId.ToString());
+        if (user.GuestId is { } guestId)
+        {
+            identity.SetClaim(AuthConstants.GuestClaim, guestId.ToString());
+        }
 
         var roles = await userManager.GetRolesAsync(user);
         identity.SetClaims(Claims.Role, [.. roles]);
@@ -98,6 +102,10 @@ public sealed class AuthorizeController(
             [Claims.Subject] = user.Id.ToString(),
             [AuthConstants.TenantClaim] = user.TenantId.ToString(),
         };
+        if (user.GuestId is { } guestId)
+        {
+            claims[AuthConstants.GuestClaim] = guestId.ToString();
+        }
 
         if (User.HasScope(Scopes.Profile))
         {

@@ -12,6 +12,8 @@ internal sealed class GetWorkOrdersQueryHandler(IApplicationDbContext dbContext)
 {
     public async Task<PagedResult<WorkOrderDto>> Handle(GetWorkOrdersQuery request, CancellationToken cancellationToken)
     {
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 100);
         var query = dbContext.WorkOrders.AsNoTracking();
 
         if (request.Status.HasValue)
@@ -23,13 +25,13 @@ internal sealed class GetWorkOrdersQueryHandler(IApplicationDbContext dbContext)
 
         var items = await query
             .OrderByDescending(w => w.CreatedAtUtc)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(w => new WorkOrderDto(
                 w.Id, w.RoomId, w.Description, w.Priority.ToString(), w.Status.ToString(),
                 w.ReportedById, w.AssignedToId, w.ResolutionNotes, w.CreatedAtUtc, w.ResolvedAtUtc))
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<WorkOrderDto>(items, total, request.Page, request.PageSize);
+        return new PagedResult<WorkOrderDto>(items, page, pageSize, total);
     }
 }

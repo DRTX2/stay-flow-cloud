@@ -2,7 +2,21 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using FluentAssertions;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+using StayFlow.Application.Common.Abstractions;
+using StayFlow.Application.Common.Exceptions;
+using StayFlow.Domain.Common;
+using StayFlow.Domain.Reservations;
+using StayFlow.Persistence;
+using StayFlow.Persistence.Identity;
+using StayFlow.Persistence.Notifications;
+using StayFlow.Application.Common.Authorization;
 
 namespace StayFlow.IntegrationTests;
 
@@ -262,6 +276,83 @@ public sealed class AuthAndApiTests(StayFlowApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task PublicHotelAvailability_ReturnsAuthoritativeInventoryAndEstimate()
+    {
+        var client = factory.CreateClient();
+        var hotels = await client.GetFromJsonAsync<JsonElement>("/api/v1/public/hotels");
+        var hotel = hotels[0];
+        var slug = hotel.GetProperty("slug").GetString();
+        var roomTypeId = hotel.GetProperty("roomTypes")[0].GetProperty("id").GetGuid();
+        var checkIn = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(300));
+        var checkOut = checkIn.AddDays(3);
+
+        var detail = await client.GetFromJsonAsync<JsonElement>($"/api/v1/public/hotels/{slug}");
+        var availability = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/public/hotels/{slug}/availability?roomTypeId={roomTypeId}&checkIn={checkIn:yyyy-MM-dd}&checkOut={checkOut:yyyy-MM-dd}&guests=1");
+
+        detail.GetProperty("slug").GetString().Should().Be(slug);
+        detail.GetProperty("currency").GetString().Should().NotBeNullOrWhiteSpace();
+        detail.GetProperty("roomTypes").GetArrayLength().Should().BeGreaterThan(0);
+        availability.GetProperty("roomTypeId").GetGuid().Should().Be(roomTypeId);
+        availability.GetProperty("nights").GetInt32().Should().Be(3);
+        availability.GetProperty("availableRoomCount").GetInt32().Should().BeGreaterThan(0);
+        availability.GetProperty("estimatedTotal").GetDecimal().Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task ConcurrentOverlappingReservations_PostgreSqlAllowsOnlyOne()
+    {
+        _ = factory.CreateClient(); // Start the host so migrations and seed data are applied.
+        var options = new DbContextOptionsBuilder<StayFlowDbContext>()
+            .UseNpgsql(factory.DatabaseConnectionString)
+            .UseOpenIddict()
+            .Options;
+        var tenantProvider = Substitute.For<ITenantProvider>();
+        await using var db1 = new StayFlowDbContext(options, tenantProvider);
+        await using var db2 = new StayFlowDbContext(options, tenantProvider);
+        var room = await db1.Rooms.IgnoreQueryFilters().AsNoTracking()
+            .FirstAsync(candidate => !candidate.IsDeleted);
+        var guest = await db1.Guests.IgnoreQueryFilters().AsNoTracking()
+            .FirstAsync(candidate => candidate.TenantId == room.TenantId && !candidate.IsDeleted);
+        var period = DateRange.Create(new DateOnly(2035, 4, 10), new DateOnly(2035, 4, 13));
+
+        db1.Reservations.Add(Reservation.Create(room.Id, guest.Id, period, 1, 300m));
+        db2.Reservations.Add(Reservation.Create(room.Id, guest.Id, period, 1, 300m));
+
+        await using var transaction1 = await db1.Database.BeginTransactionAsync();
+        await using var transaction2 = await db2.Database.BeginTransactionAsync();
+        await db1.SaveChangesAsync();
+        var competingSave = db2.SaveChangesAsync();
+        await Task.Delay(100);
+        await transaction1.CommitAsync();
+
+        var act = async () => await competingSave;
+        await act.Should().ThrowAsync<ReservationConflictException>()
+            .WithMessage("*Choose another room or change the dates*");
+        await transaction2.RollbackAsync();
+    }
+
+    [Fact]
+    public async Task OverlappingReservation_ReturnsActionableConflict()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+        var roomId = (await client.GetFromJsonAsync<JsonElement>("/api/v1/rooms"))
+            .GetProperty("items")[0].GetProperty("id").GetGuid();
+        var guestId = (await client.GetFromJsonAsync<JsonElement>("/api/v1/guests"))
+            .GetProperty("items")[0].GetProperty("id").GetGuid();
+        var checkIn = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(330));
+        var request = new { roomId, guestId, checkIn, checkOut = checkIn.AddDays(2), numberOfGuests = 1 };
+        (await client.PostAsJsonAsync("/api/v1/reservations", request)).EnsureSuccessStatusCode();
+
+        var conflict = await client.PostAsJsonAsync("/api/v1/reservations", request);
+
+        conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var problem = await conflict.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("title").GetString().Should().Be("Reservation conflict.");
+        problem.GetProperty("detail").GetString().Should().Contain("change the dates");
+    }
+
+    [Fact]
     public async Task CheckedOutStay_FeedbackInvitationAcceptsOneResponse()
     {
         var client = await CreateAuthenticatedClientAsync();
@@ -321,12 +412,180 @@ public sealed class AuthAndApiTests(StayFlowApiFactory factory) : IClassFixture<
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task PortalInvitation_LinksExactGuestOnce_AndRefreshesClaims()
+    {
+        var admin = await CreateAuthenticatedClientAsync();
+        var roomId = (await admin.GetFromJsonAsync<JsonElement>("/api/v1/rooms"))
+            .GetProperty("items")[0].GetProperty("id").GetGuid();
+        var guestId = (await admin.GetFromJsonAsync<JsonElement>("/api/v1/guests"))
+            .GetProperty("items")[0].GetProperty("id").GetGuid();
+        var checkIn = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(400));
+        var createdReservation = await admin.PostAsJsonAsync("/api/v1/reservations", new
+        {
+            roomId,
+            guestId,
+            checkIn,
+            checkOut = checkIn.AddDays(2),
+            numberOfGuests = 1,
+        });
+        createdReservation.EnsureSuccessStatusCode();
+        var reservationId = (await createdReservation.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+        var invitationResponse = await admin.PostAsync($"/api/v1/reservations/{reservationId}/portal-invitation", null);
+        invitationResponse.EnsureSuccessStatusCode();
+        var invitation = await invitationResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var token = invitation.GetProperty("token").GetString()!;
+
+        var email = $"portal-{Guid.NewGuid():N}@example.test";
+        const string password = "Portal12345$";
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                FullName = "Portal Test User",
+                TenantId = Guid.Empty,
+            };
+            (await users.CreateAsync(user, password)).Succeeded.Should().BeTrue();
+            (await users.AddToRoleAsync(user, Roles.Customer)).Succeeded.Should().BeTrue();
+        }
+
+        var (customer, refreshToken) = await CreateInteractiveUserClientAsync(email, password);
+        var linked = await customer.PostAsJsonAsync("/api/v1/portal/link", new { token });
+        linked.StatusCode.Should().Be(HttpStatusCode.NoContent, await linked.Content.ReadAsStringAsync());
+
+        var replay = await customer.PostAsJsonAsync("/api/v1/portal/link", new { token });
+        replay.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var refreshed = await customer.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["client_id"] = "stayflow-spa",
+            ["refresh_token"] = refreshToken,
+        }));
+        refreshed.EnsureSuccessStatusCode();
+        var refreshedPayload = await refreshed.Content.ReadFromJsonAsync<JsonElement>();
+        customer.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", refreshedPayload.GetProperty("access_token").GetString());
+
+        var me = await customer.GetFromJsonAsync<JsonElement>("/api/v1/me");
+        me.GetProperty("tenantId").GetString().Should().NotBe(Guid.Empty.ToString());
+        var reservations = await customer.GetFromJsonAsync<JsonElement>("/api/v1/portal/reservations");
+        reservations.EnumerateArray().Should().Contain(item => item.GetProperty("id").GetGuid() == reservationId);
+    }
+
+    [Fact]
+    public async Task Notifications_AreUserScoped_AndCanBeMarkedRead()
+    {
+        _ = factory.CreateClient(); // Ensure migrations and seed data have completed.
+        Guid notificationId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<StayFlowDbContext>();
+            var admin = await db.Users.SingleAsync(user => user.Email == "admin@stayflow.local");
+            notificationId = Guid.NewGuid();
+            db.InAppNotifications.AddRange(
+                new InAppNotification
+                {
+                    Id = notificationId,
+                    TenantId = admin.TenantId,
+                    UserId = admin.Id,
+                    Title = "Reservation created",
+                    Body = "A new reservation is ready for review.",
+                    Type = "reservation",
+                    Link = "/dashboard/reservations",
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    SourceEventId = Guid.NewGuid(),
+                },
+                new InAppNotification
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = admin.TenantId,
+                    UserId = Guid.NewGuid(),
+                    Title = "Other user's notification",
+                    Body = "Must not be returned.",
+                    Type = "reservation",
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    SourceEventId = Guid.NewGuid(),
+                });
+            await db.SaveChangesAsync();
+        }
+
+        var (client, _) = await CreateInteractiveUserClientAsync("admin@stayflow.local", "Admin123$");
+        var list = await client.GetFromJsonAsync<JsonElement>("/api/v1/notifications");
+        list.GetProperty("items").EnumerateArray()
+            .Should().ContainSingle(item => item.GetProperty("id").GetGuid() == notificationId);
+        list.GetProperty("items").EnumerateArray()
+            .Should().NotContain(item => item.GetProperty("title").GetString() == "Other user's notification");
+
+        var marked = await client.PostAsync($"/api/v1/notifications/{notificationId}/read", null);
+        marked.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var refreshed = await client.GetFromJsonAsync<JsonElement>("/api/v1/notifications");
+        refreshed.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == notificationId)
+            .GetProperty("readAtUtc").ValueKind.Should().Be(JsonValueKind.String);
+    }
+
     private async Task<HttpClient> CreateAuthenticatedClientAsync()
     {
         var client = factory.CreateClient();
         var token = await GetClientCredentialsTokenAsync(client, TestAdminClientId, TestAdminClientSecret);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
+    }
+
+    private async Task<(HttpClient Client, string RefreshToken)> CreateInteractiveUserClientAsync(string email, string password)
+    {
+        var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true,
+        });
+        var verifier = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        var challenge = Convert.ToBase64String(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var authorizeQuery = await new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["client_id"] = "stayflow-spa",
+            ["response_type"] = "code",
+            ["redirect_uri"] = "http://localhost:3000/api/auth/callback",
+            ["scope"] = "openid profile email roles offline_access stayflow.api",
+            ["code_challenge"] = challenge,
+            ["code_challenge_method"] = "S256",
+            ["state"] = "integration-test-state",
+        }).ReadAsStringAsync();
+        var authorizeUrl = "/connect/authorize?" + authorizeQuery;
+
+        var login = await client.PostAsync("/account/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["email"] = email,
+            ["password"] = password,
+            ["returnUrl"] = authorizeUrl,
+        }));
+        login.StatusCode.Should().Be(HttpStatusCode.Redirect);
+
+        var authorize = await client.GetAsync(login.Headers.Location);
+        authorize.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        var callback = new Uri(authorize.Headers.Location!.ToString());
+        var code = System.Web.HttpUtility.ParseQueryString(callback.Query)["code"]!;
+
+        var exchange = await client.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "authorization_code",
+            ["client_id"] = "stayflow-spa",
+            ["code"] = code,
+            ["redirect_uri"] = "http://localhost:3000/api/auth/callback",
+            ["code_verifier"] = verifier,
+        }));
+        exchange.EnsureSuccessStatusCode();
+        var payload = await exchange.Content.ReadFromJsonAsync<JsonElement>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", payload.GetProperty("access_token").GetString());
+        return (client, payload.GetProperty("refresh_token").GetString()!);
     }
 
     private static async Task<string> GetClientCredentialsTokenAsync(

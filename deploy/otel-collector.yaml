@@ -1,0 +1,63 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  filelog/docker:
+    include: [/var/lib/docker/containers/*/*.log]
+    start_at: end
+    include_file_path: true
+    operators:
+      - id: docker-json
+        type: json_parser
+      - id: application-json
+        type: json_parser
+        parse_from: body.log
+        parse_to: attributes
+        if: 'body.log matches "^\\s*\\{"'
+        on_error: send_quiet
+
+processors:
+  batch:
+  resource/default-service:
+    attributes:
+      - key: service.name
+        value: stayflow-compose
+        action: insert
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/default-service, batch]
+      exporters: [otlp/tempo]
+    logs:
+      receivers: [otlp, filelog/docker]
+      processors: [memory_limiter, resource/default-service, batch]
+      exporters: [otlphttp/loki]

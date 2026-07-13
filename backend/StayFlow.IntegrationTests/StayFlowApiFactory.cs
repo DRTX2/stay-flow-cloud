@@ -15,6 +15,8 @@ public sealed class StayFlowApiFactory : WebApplicationFactory<Program>, IAsyncL
         .WithImage("postgres:16-alpine")
         .Build();
 
+    public string DatabaseConnectionString => _database.GetConnectionString();
+
     public async Task InitializeAsync()
     {
         await _database.StartAsync();

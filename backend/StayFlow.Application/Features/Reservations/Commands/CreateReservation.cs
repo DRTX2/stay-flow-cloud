@@ -68,10 +68,7 @@ public sealed class CreateReservationHandler(IApplicationDbContext dbContext, IP
             dbContext, request.RoomId, request.CheckIn, request.CheckOut, cancellationToken);
         if (overlaps)
         {
-            throw new ValidationException(
-            [
-                new ValidationFailure(nameof(request.RoomId), "The room is already booked for the selected dates."),
-            ]);
+            throw new ReservationConflictException();
         }
 
         var occupancy = await ReservationAvailability.OccupancyAsync(

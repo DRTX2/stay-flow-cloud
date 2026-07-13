@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using StayFlow.Application.Common.Exceptions;
 using StayFlow.Domain.Common;
@@ -29,6 +30,10 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
         {
             await WriteProblemAsync(context, Problem(StatusCodes.Status404NotFound, "Resource not found.", ex.Message));
         }
+        catch (ReservationConflictException ex)
+        {
+            await WriteProblemAsync(context, Problem(StatusCodes.Status409Conflict, "Reservation conflict.", ex.Message));
+        }
         catch (DomainException ex)
         {
             await WriteProblemAsync(context, Problem(StatusCodes.Status409Conflict, "Domain rule violated.", ex.Message));
@@ -58,6 +63,7 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
         }
 
         context.Response.Clear();
+        problem.Extensions["traceId"] = Activity.Current?.TraceId.ToHexString() ?? context.TraceIdentifier;
         context.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;
         context.Response.ContentType = "application/problem+json";
         await context.Response.WriteAsJsonAsync(problem, problem.GetType());

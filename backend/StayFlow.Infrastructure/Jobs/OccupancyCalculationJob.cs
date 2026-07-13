@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Domain.Reservations;
+using StayFlow.Infrastructure.Observability;
 using StayFlow.Persistence;
 
 namespace StayFlow.Infrastructure.Jobs;
@@ -15,10 +16,12 @@ namespace StayFlow.Infrastructure.Jobs;
 public sealed class OccupancyCalculationJob(
     StayFlowDbContext dbContext,
     IDateTimeProvider clock,
+    StayFlowMetrics metrics,
     ILogger<OccupancyCalculationJob> logger)
 {
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        using var measurement = metrics.MeasureJob("occupancy_calculation");
         var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
 
         var tenants = await dbContext.Tenants
@@ -53,5 +56,6 @@ public sealed class OccupancyCalculationJob(
                 "Occupancy for {Tenant} on {Date}: {Occupied}/{Total} rooms ({Percent}%)",
                 tenant.Name, today, occupied, totalRooms, occupancyPercent);
         }
+        measurement.Succeed();
     }
 }

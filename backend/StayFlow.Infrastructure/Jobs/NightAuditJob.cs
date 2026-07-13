@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StayFlow.Application.Common.Abstractions;
 using StayFlow.Domain.Reservations;
+using StayFlow.Infrastructure.Observability;
 using StayFlow.Persistence;
 
 namespace StayFlow.Infrastructure.Jobs;
@@ -16,10 +17,12 @@ namespace StayFlow.Infrastructure.Jobs;
 public sealed class NightAuditJob(
     StayFlowDbContext dbContext,
     IDateTimeProvider clock,
+    StayFlowMetrics metrics,
     ILogger<NightAuditJob> logger)
 {
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        using var measurement = metrics.MeasureJob("night_audit");
         var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
 
         var reservations = dbContext.Reservations.IgnoreQueryFilters().Where(r => !r.IsDeleted);
@@ -34,5 +37,6 @@ public sealed class NightAuditJob(
 
         // TODO: flag overdue arrivals (Confirmed with CheckIn < today) as no-shows and persist a
         // daily revenue roll-up once the corresponding domain operations are available.
+        measurement.Succeed();
     }
 }

@@ -1,12 +1,14 @@
-using Microsoft.AspNetCore.HttpOverrides;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Formatting.Json;
 using StayFlow.Api.Middleware;
 using StayFlow.Api.Observability;
+using StayFlow.Api.OpenApi;
 using StayFlow.Application;
 using StayFlow.Infrastructure;
 using StayFlow.Infrastructure.Auditing;
@@ -14,6 +16,7 @@ using StayFlow.Infrastructure.Caching;
 using StayFlow.Infrastructure.Identity;
 using StayFlow.Infrastructure.Jobs;
 using StayFlow.Infrastructure.Messaging;
+using StayFlow.Infrastructure.Observability;
 using StayFlow.Infrastructure.Storage;
 using StayFlow.Persistence;
 
@@ -21,7 +24,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((context, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
-    .WriteTo.Console());
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("service", ObservabilityExtensions.ServiceName)
+    .Enrich.With<ActivityLogEnricher>()
+    .Enrich.With<SensitiveDataLogEnricher>()
+    .WriteTo.Console(new JsonFormatter(renderMessage: true)));
 
 var connectionString = builder.Configuration["STAYFLOW_APP_CONNECTION"]
     ?? builder.Configuration.GetConnectionString("Default")
@@ -31,7 +38,10 @@ connectionString = PostgreSqlConnectionString.Normalize(connectionString);
 builder.Services.AddApplication();
 builder.Services.AddPersistence(connectionString);
 builder.Services.AddInfrastructure(builder.Environment.IsDevelopment(), builder.Configuration);
-builder.Services.AddCaching(builder.Configuration.GetConnectionString("Redis"));
+builder.Services.AddCaching(
+    builder.Configuration.GetConnectionString("Redis"),
+    builder.Configuration,
+    builder.Environment.IsDevelopment());
 builder.Services.AddAudit(builder.Configuration.GetConnectionString("Mongo"));
 builder.Services.AddObservability(builder.Configuration);
 builder.Services.AddMessaging(builder.Configuration);
@@ -89,9 +99,9 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo 
-    { 
-        Title = "StayFlow Cloud API", 
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "StayFlow Cloud API",
         Version = "v1",
         Description = "StayFlow Cloud Property Management System API"
     });
@@ -104,8 +114,13 @@ builder.Services.AddSwaggerGen(options =>
         options.IncludeXmlComments(xmlPath);
     }
 
-    // Swagger UI uses Authorization Code + PKCE — the same secure flow as the production SPA.
-    // No password grant. No client secret exposed to the browser.
+    options.CustomOperationIds(description =>
+        $"{description.ActionDescriptor.RouteValues["controller"]}_{description.ActionDescriptor.RouteValues["action"]}_{description.HttpMethod}"
+            .ToLowerInvariant());
+    options.TagActionsBy(description => [description.ActionDescriptor.RouteValues["controller"] ?? "API"]);
+    options.OperationFilter<AuthorizationOperationFilter>();
+
+    // Interactive clients use Authorization Code + PKCE; service integrations use client credentials.
     options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.OAuth2,
@@ -114,6 +129,14 @@ builder.Services.AddSwaggerGen(options =>
             AuthorizationCode = new OpenApiOAuthFlow
             {
                 AuthorizationUrl = new Uri("/connect/authorize", UriKind.Relative),
+                TokenUrl = new Uri("/connect/token", UriKind.Relative),
+                Scopes = new Dictionary<string, string>
+                {
+                    [AuthConstants.ApiScope] = "StayFlow API access",
+                },
+            },
+            ClientCredentials = new OpenApiOAuthFlow
+            {
                 TokenUrl = new Uri("/connect/token", UriKind.Relative),
                 Scopes = new Dictionary<string, string>
                 {
@@ -142,11 +165,13 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSerilogRequestLogging();
 
-if (app.Environment.IsDevelopment())
+var docsEnabled = builder.Configuration.GetValue<bool?>("Docs:Enabled") ?? app.Environment.IsDevelopment();
+if (docsEnabled)
 {
-    app.UseSwagger();
-    app.MapScalarApiReference(options =>
+    app.UseSwagger(options => options.RouteTemplate = "openapi/{documentName}.json");
+    app.MapScalarApiReference("/docs", options =>
     {
+        options.OpenApiRoutePattern = "/openapi/{documentName}.json";
         options.Authentication = new ScalarAuthenticationOptions
         {
             PreferredSecuritySchemes = ["oauth2"]
@@ -155,6 +180,24 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("frontend");
+
+var metricsToken = builder.Configuration["Metrics:BearerToken"];
+if (!string.IsNullOrWhiteSpace(metricsToken))
+{
+    app.UseWhen(
+        context => context.Request.Path == "/metrics",
+        branch => branch.Use(async (context, next) =>
+        {
+            var supplied = context.Request.Headers.Authorization.ToString();
+            if (!string.Equals(supplied, $"Bearer {metricsToken}", StringComparison.Ordinal))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
+            await next(context);
+        }));
+}
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -168,7 +211,6 @@ app.UseSession();
 
 app.MapControllers();
 app.MapObservability();
-app.UseBackgroundJobs();
 
 var runMigrationsOnStartup = builder.Configuration.GetValue("Database:RunMigrationsOnStartup", false);
 var ensureCreatedOnStartup = builder.Configuration.GetValue("Database:EnsureCreatedOnStartup", false);
@@ -199,6 +241,8 @@ else if (ensureCreatedOnStartup)
     await context.Database.EnsureCreatedAsync();
     await scope.ServiceProvider.GetRequiredService<DataSeeder>().SeedAsync();
 }
+
+app.UseBackgroundJobs();
 
 // IMPORTANT: Migrations and seeding are NO LONGER run on API startup.
 // Run them explicitly using the StayFlow.MigrationHost CLI tool before deploying the API:

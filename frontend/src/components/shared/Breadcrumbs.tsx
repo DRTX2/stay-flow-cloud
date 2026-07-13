@@ -4,49 +4,58 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
+import type { Locale } from "@/i18n/config";
+import {
+  getNavLabel,
+  getRouteItem,
+  getVisibleNavSections,
+  type NavClaims,
+} from "@/components/layout/nav";
 
-const LABELS: Record<string, string> = {
-  dashboard: "Dashboard",
-  reservations: "Reservations",
-  rooms: "Rooms",
-  "room-types": "Room Types",
-  guests: "Guests",
-  invoices: "Invoices",
-  services: "Services",
-  analytics: "Analytics",
-  audit: "Audit",
-  "tenant-features": "Tenant Features",
-  documents: "Documents",
-  settings: "Settings",
-};
-
-function label(segment: string): string {
-  return LABELS[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1);
+function fallbackLabel(segment: string): string {
+  return segment
+    .replaceAll("-", " ")
+    .replace(/^./, (character) => character.toUpperCase());
 }
 
-export function Breadcrumbs() {
+export function Breadcrumbs({ locale, claims }: { locale: Locale; claims: NavClaims }) {
   const pathname = usePathname();
-  const segments = pathname.split("/").filter(Boolean);
-
-  const crumbs = segments.map((seg, i) => ({
-    href: "/" + segments.slice(0, i + 1).join("/"),
-    label: label(seg),
-  }));
+  const sections = getVisibleNavSections(claims);
+  const home = sections[0]?.items[0];
+  const route = getRouteItem(pathname);
+  const trailingSegments = route
+    ? pathname.slice(route.href.length).split("/").filter(Boolean)
+    : [];
+  const crumbs = [
+    ...(home ? [{ href: home.href, label: getNavLabel(home, locale) }] : []),
+    ...(route && route.href !== home?.href
+      ? [{ href: route.href, label: getNavLabel(route, locale) }]
+      : []),
+    ...trailingSegments.map((segment, index) => ({
+      href: `${route?.href ?? "/dashboard"}/${trailingSegments.slice(0, index + 1).join("/")}`,
+      label: fallbackLabel(segment),
+    })),
+  ];
 
   return (
     <nav aria-label="Breadcrumb" className="hidden md:block">
       <ol className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        {crumbs.map((c, i) => {
-          const isLast = i === crumbs.length - 1;
+        {crumbs.map((crumb, index) => {
+          const isLast = index === crumbs.length - 1;
           return (
-            <Fragment key={c.href}>
-              {i > 0 && <ChevronRight className="h-3.5 w-3.5" />}
+            <Fragment key={crumb.href}>
+              {index > 0 && <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />}
               <li>
                 {isLast ? (
-                  <span className="font-medium text-foreground">{c.label}</span>
+                  <span aria-current="page" className="font-medium text-foreground">
+                    {crumb.label}
+                  </span>
                 ) : (
-                  <Link href={c.href} className="transition-colors hover:text-foreground">
-                    {c.label}
+                  <Link
+                    href={crumb.href}
+                    className="transition-colors hover:text-foreground"
+                  >
+                    {crumb.label}
                   </Link>
                 )}
               </li>

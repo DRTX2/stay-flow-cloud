@@ -149,6 +149,9 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: '1'
 
+      - name: Validate observability stack
+        run: bash deploy/validate-observability.sh
+
       # ── Trivy filesystem scan ──────────────────────────────────────────────
       # exit-code: '1' makes the job FAIL on HIGH or CRITICAL findings, turning
       # this into a real DevSecOps gate (not just an advisory report).
@@ -182,7 +185,7 @@ jobs:
 
       - name: Upload Trivy SARIF
         if: always() && github.event.repository.private == false
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-fs.sarif
 
@@ -201,16 +204,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Analyze
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
 
   e2e:
     name: E2E

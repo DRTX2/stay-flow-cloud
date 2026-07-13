@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { exchangeCode } from "@/server/auth/oidc";
 import { SESSION, writeTokenCookies } from "@/server/auth/cookies";
 import { serverConfig } from "@/server/config";
+import { decodeJwt } from "jose";
+import { authenticatedDestination } from "@/server/auth/routing";
 
 function loginWithError(request: NextRequest, reason: string) {
   const url = new URL("/login", serverConfig.siteUrl);
@@ -11,7 +13,13 @@ function loginWithError(request: NextRequest, reason: string) {
 
 function safeReturnTo(value: string | undefined): string {
   if (value && value.startsWith("/") && !value.startsWith("//")) return value;
-  return "/dashboard";
+  return "/";
+}
+
+function rolesFromToken(token: string): string[] {
+  const claims = decodeJwt(token) as Record<string, unknown>;
+  const roles = claims.role ?? claims.roles;
+  return roles == null ? [] : Array.isArray(roles) ? roles.map(String) : [String(roles)];
 }
 
 /**
@@ -35,7 +43,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const tokens = await exchangeCode(code, verifier);
-    const response = NextResponse.redirect(new URL(returnTo, serverConfig.siteUrl));
+    const destination = authenticatedDestination(
+      returnTo,
+      rolesFromToken(tokens.accessToken),
+    );
+    const response = NextResponse.redirect(new URL(destination, serverConfig.siteUrl));
     writeTokenCookies(response.cookies, tokens);
     response.cookies.delete(SESSION.verifier);
     response.cookies.delete(SESSION.state);

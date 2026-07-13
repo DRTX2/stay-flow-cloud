@@ -83,5 +83,9 @@ public sealed class Room : TenantEntity
 
     public void UpdateCleaningStatus(RoomCleaningStatus status) => CleaningStatus = status;
 
-    public bool IsBookable => Status == RoomStatus.Available;
+    /// <summary>
+    /// Whether the room is operationally eligible for a reservation. Occupied is intentionally
+    /// bookable because date overlap, rather than today's occupancy, determines future availability.
+    /// </summary>
+    public bool IsBookable => Status is not RoomStatus.Maintenance and not RoomStatus.OutOfService;
 }

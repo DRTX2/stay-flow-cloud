@@ -8,6 +8,7 @@ public static class AuthConstants
 
     /// <summary>Custom claim carrying the user's tenant; consumed by the tenant provider.</summary>
     public const string TenantClaim = "tenant_id";
+    public const string GuestClaim = "guest_id";
 
     /// <summary>Custom claim carrying a granted permission string.</summary>
     public const string PermissionClaim = "permission";

@@ -7,14 +7,7 @@ import type { CreateGuestRequest } from "@/types/api";
 
 export type { ActionResult };
 
-/**
- * Update the guest profile. Uses PUT if we could resolve a guest id, POST otherwise.
- * In the current architecture the guest id is not embedded in the token, so we attempt
- * to fetch the guest list (the Customer role has `guests:read` on some setups) and match
- * by email. If that fails we fall back to creating a new guest record.
- *
- * A future iteration can embed the guest id as a token claim for a cleaner flow.
- */
+/** Update the explicitly linked guest profile. */
 export async function updateProfileAction(
   input: CreateGuestRequest,
 ): Promise<ActionResult> {

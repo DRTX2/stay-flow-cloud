@@ -55,7 +55,7 @@ const integrations: IntegrationItem[] = [
     description:
       "Document and file storage with tenant-scoped buckets and CloudFront CDN.",
     icon: Cloud,
-    status: "active",
+    status: "available",
     category: "Storage",
   },
   {
@@ -67,16 +67,16 @@ const integrations: IntegrationItem[] = [
   },
   {
     name: "MongoDB",
-    description: "Audit log and event store for immutable domain event trails.",
+    description: "Optional audit sink when a MongoDB connection is configured.",
     icon: Database,
-    status: "active",
+    status: "available",
     category: "Data",
   },
   {
     name: "Redis",
-    description: "Distributed cache, rate limiting, and session storage.",
+    description: "Optional distributed cache and shared Data Protection key store.",
     icon: Database,
-    status: "active",
+    status: "available",
     category: "Data",
   },
   // Messaging
@@ -104,10 +104,9 @@ const integrations: IntegrationItem[] = [
   },
   {
     name: "Prometheus + Grafana",
-    description:
-      "Metrics scraping and pre-built dashboards for API performance monitoring.",
+    description: "Local observability profile with provisioned metrics dashboards.",
     icon: MonitorSmartphone,
-    status: "active",
+    status: "available",
     category: "Observability",
   },
   // API
@@ -138,6 +137,7 @@ function StatusIcon({ status }: { status: IntegrationItem["status"] }) {
 }
 
 export function IntegrationsView() {
+  const apiOrigin = process.env.NEXT_PUBLIC_OIDC_AUTHORITY ?? "http://localhost:8080";
   const categories = Array.from(new Set(integrations.map((i) => i.category)));
 
   return (
@@ -194,15 +194,15 @@ export function IntegrationsView() {
           <CardDescription>
             The full API reference is available at{" "}
             <a
-              href="/api/v1"
+              href={`${apiOrigin}/docs`}
               target="_blank"
               rel="noopener noreferrer"
               className="font-medium underline hover:text-foreground"
             >
-              Swagger / OpenAPI
+              Scalar / OpenAPI
             </a>{" "}
-            when the backend is running. All endpoints are tenant-scoped and require
-            OAuth2 bearer tokens.
+            when API documentation is enabled. Public operations are anonymous;
+            operational endpoints require OAuth2 scopes and tenant permissions.
           </CardDescription>
         </CardContent>
       </Card>

@@ -2,21 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { MapPin, Star, Users } from "lucide-react";
+import { Hotel, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { money } from "@/lib/format";
-import { getHotelBySlug, getHotelSlugs } from "@/content/hotels";
+import { getHotelBySlug } from "@/content/hotels";
 import { getLocale } from "@/i18n/server";
 
-export const revalidate = 3600;
-
-// Prerender every hotel at build; new slugs are generated on demand and cached (ISR).
-export async function generateStaticParams() {
-  const slugs = await getHotelSlugs();
-  return slugs.map((slug) => ({ slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -27,7 +21,7 @@ export async function generateMetadata({
   const hotel = await getHotelBySlug(slug);
   if (!hotel) return { title: "Hotel not found" };
 
-  const title = `${hotel.name} — ${hotel.city}, ${hotel.country}`;
+  const title = `${hotel.name} · StayFlow Cloud`;
   return {
     title,
     description: hotel.description,
@@ -59,14 +53,7 @@ export default async function HotelDetailPage({
     name: hotel.name,
     description: hotel.description,
     image: hotel.heroImageUrl,
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: hotel.city,
-      addressCountry: hotel.country,
-    },
-    aggregateRating: hotel.rating
-      ? { "@type": "AggregateRating", ratingValue: hotel.rating, bestRating: 5 }
-      : undefined,
+    additionalType: hotel.propertyType,
     priceRange: hotel.fromRate ? `from ${money(hotel.fromRate)}` : undefined,
   };
 
@@ -98,33 +85,21 @@ export default async function HotelDetailPage({
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{hotel.name}</h1>
           <p className="mt-1 flex items-center gap-1 text-muted-foreground">
-            <MapPin className="h-4 w-4" />
-            {hotel.city}, {hotel.country}
+            <Hotel className="h-4 w-4" />
+            {hotel.propertyType}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-sm font-medium">
-            <Star className="h-4 w-4 fill-warning text-warning" />
-            {hotel.rating}
-          </span>
-          <Badge variant="secondary">
-            {locale === "es" ? "desde" : "from"} {money(hotel.fromRate)} /{" "}
-            {locale === "es" ? "noche" : "night"}
-          </Badge>
+          {hotel.fromRate != null && (
+            <Badge variant="secondary">
+              {locale === "es" ? "desde" : "from"} {money(hotel.fromRate)} /{" "}
+              {locale === "es" ? "noche" : "night"}
+            </Badge>
+          )}
         </div>
       </div>
 
       <p className="mt-4 max-w-3xl text-muted-foreground">{hotel.description}</p>
-
-      {hotel.amenities && hotel.amenities.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {hotel.amenities.map((a) => (
-            <Badge key={a} variant="outline">
-              {a}
-            </Badge>
-          ))}
-        </div>
-      )}
 
       <h2 className="mt-10 text-2xl font-bold tracking-tight">
         {locale === "es" ? "Habitaciones" : "Rooms"}

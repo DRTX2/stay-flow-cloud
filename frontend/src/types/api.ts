@@ -271,6 +271,8 @@ export interface DocumentItem {
 export interface PublicHotel {
   slug: string;
   name?: string;
+  propertyType?: string;
+  currency?: string;
   city?: string;
   country?: string;
   description?: string;
@@ -291,6 +293,19 @@ export interface PublicRoomType {
 
 export interface PublicHotelDetail extends PublicHotel {
   roomTypes?: PublicRoomType[];
+}
+
+export interface PublicAvailability {
+  hotelSlug: string;
+  roomTypeId: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  nights: number;
+  availableRoomCount: number;
+  estimatedTotal?: number;
+  averageNightlyRate?: number;
+  currency: string;
 }
 
 export interface BookingRequest {
@@ -455,4 +470,18 @@ export interface Order {
   createdAtUtc?: string;
   deliveredAtUtc?: string;
   items?: OrderLineItem[];
+}
+export interface InAppNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  link: string | null;
+  createdAtUtc: string;
+  readAtUtc: string | null;
+}
+
+export interface NotificationList {
+  items: InAppNotification[];
+  unreadCount: number;
 }

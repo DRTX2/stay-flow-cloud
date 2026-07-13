@@ -9,6 +9,8 @@ public interface ICurrentUser
 
     Guid? TenantId { get; }
 
+    Guid? GuestId { get; }
+
     bool IsAuthenticated { get; }
 
     IReadOnlySet<string> Permissions { get; }

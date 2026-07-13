@@ -126,8 +126,8 @@ public sealed class AuthController(
     }
 
     // Shared by the Authorization Code exchange and Refresh Token rotation: OpenIddict restores the
-    // principal stashed when the code/refresh token was issued. We only re-validate that the account
-    // is still active before re-issuing tokens.
+    // principal stashed when the code/refresh token was issued. Rebuild mutable account claims so
+    // role changes, deactivation and an explicit guest link take effect on refresh.
     private async Task<IActionResult> HandleStoredPrincipalGrantAsync()
     {
         var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -145,9 +145,53 @@ public sealed class AuthController(
             {
                 return Forbidden(OpenIddictConstants.Errors.InvalidGrant, "The account is no longer active.");
             }
+
+            var identity = (ClaimsIdentity)principal.Identity!;
+            ReplaceClaim(identity, AuthConstants.TenantClaim, user.TenantId.ToString());
+            ReplaceClaim(identity, AuthConstants.GuestClaim, user.GuestId?.ToString());
+            foreach (var claim in identity.FindAll(AuthConstants.TenantClaim)
+                         .Concat(identity.FindAll(AuthConstants.GuestClaim)))
+            {
+                claim.SetDestinations(OpenIddictConstants.Destinations.AccessToken);
+            }
+
+            foreach (var claim in identity.FindAll(OpenIddictConstants.Claims.Role).ToList())
+            {
+                identity.RemoveClaim(claim);
+            }
+            var roles = await userManager.GetRolesAsync(user);
+            identity.SetClaims(OpenIddictConstants.Claims.Role, [.. roles]);
+            foreach (var claim in identity.FindAll(OpenIddictConstants.Claims.Role))
+            {
+                claim.SetDestinations(principal.HasScope(OpenIddictConstants.Scopes.Roles)
+                    ? [OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken]
+                    : [OpenIddictConstants.Destinations.AccessToken]);
+            }
+
+            foreach (var claim in identity.FindAll(AuthConstants.PermissionClaim).ToList())
+            {
+                identity.RemoveClaim(claim);
+            }
+            identity.SetClaims(AuthConstants.PermissionClaim, [.. await ResolvePermissionsAsync(roles)]);
+            foreach (var claim in identity.FindAll(AuthConstants.PermissionClaim))
+            {
+                claim.SetDestinations(OpenIddictConstants.Destinations.AccessToken);
+            }
         }
 
         return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    private static void ReplaceClaim(ClaimsIdentity identity, string type, string? value)
+    {
+        foreach (var claim in identity.FindAll(type).ToList())
+        {
+            identity.RemoveClaim(claim);
+        }
+        if (value is not null)
+        {
+            identity.SetClaim(type, value);
+        }
     }
 
     private async Task<IReadOnlyCollection<string>> ResolvePermissionsAsync(IEnumerable<string> roles)

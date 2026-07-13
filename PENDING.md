@@ -15,18 +15,21 @@ The three workflows below are the product. Every new feature should improve one 
 
 ## Production hardening
 
-- Keep migrations and seed out of API startup through `StayFlow.MigrationHost` and run it as an explicit
-  deployment step.
 - Use separate database users for migrator and runtime application access.
 - Move Azure PostgreSQL behind private networking once the student-friendly deployment is stable.
 - Add staging -> production promotion with required reviewers and environment-specific configuration.
-- Add SBOM generation, image signing and provenance verification before deployment.
 - Add DAST/smoke tests against deployed staging.
+- Add PostgreSQL RLS as defense in depth for tenant-owned tables.
+- Add durable object storage before enabling production document uploads.
+
+Completed foundations include explicit migration jobs, commit-gated deployment, SBOM/provenance,
+persistent OpenIddict/Data Protection keys, concurrency-safe active-room reservations, Scalar/OpenAPI,
+and a local OpenTelemetry/Prometheus/Loki/Tempo/Grafana stack.
 
 ## Later differentiators
 
 - Per-tenant subscription plans and usage metering.
-- AI assistant / semantic search only after the reservation and operations flows feel complete.
+- Tenant knowledge base, extractive search and local Ollama/Whisper adapters after notifications and inventory.
 - Further microservice extraction only when a real operational seam justifies it.
 - Real-time operations board with SignalR once daily operations needs push updates.
 
