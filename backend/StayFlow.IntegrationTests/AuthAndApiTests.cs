@@ -48,6 +48,18 @@ public sealed class AuthAndApiTests(StayFlowApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task ExternalProviders_OnlyReturnsConfiguredSchemes()
+    {
+        var client = factory.CreateClient();
+
+        var providers = await client.GetFromJsonAsync<JsonElement>("/account/external/providers");
+        var unsupported = await client.GetAsync("/account/external?provider=Unsupported");
+
+        providers.ValueKind.Should().Be(JsonValueKind.Array);
+        unsupported.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Rooms_WithToken_ReturnsSeededInventory()
     {
         var client = await CreateAuthenticatedClientAsync();

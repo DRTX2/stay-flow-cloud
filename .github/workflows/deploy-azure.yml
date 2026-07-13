@@ -272,6 +272,17 @@ jobs:
 
       - name: Deploy immutable images
         uses: azure/cli@v2
+        env:
+          NEON_CONNECTION_STRING: ${{ secrets.NEON_CONNECTION_STRING }}
+          STAYFLOW_ADMIN_EMAIL: ${{ secrets.STAYFLOW_ADMIN_EMAIL }}
+          STAYFLOW_ADMIN_PASSWORD: ${{ secrets.STAYFLOW_ADMIN_PASSWORD }}
+          STAYFLOW_SERVICE_CLIENT_SECRET: ${{ secrets.STAYFLOW_SERVICE_CLIENT_SECRET }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          MICROSOFT_OAUTH_CLIENT_ID: ${{ secrets.MICROSOFT_OAUTH_CLIENT_ID }}
+          MICROSOFT_OAUTH_CLIENT_SECRET: ${{ secrets.MICROSOFT_OAUTH_CLIENT_SECRET }}
+          FACEBOOK_APP_ID: ${{ secrets.FACEBOOK_APP_ID }}
+          FACEBOOK_APP_SECRET: ${{ secrets.FACEBOOK_APP_SECRET }}
         with:
           inlineScript: |
             owner="${GITHUB_REPOSITORY_OWNER,,}"
@@ -282,7 +293,7 @@ jobs:
               --parameters location="$APP_LOCATION" \
               --parameters containerEnvName="$CONTAINER_ENV_NAME" \
               --parameters containerEnvResourceGroup="$CONTAINER_ENV_RESOURCE_GROUP" \
-              --parameters neonConnectionString="${{ secrets.NEON_CONNECTION_STRING }}" \
+              --parameters neonConnectionString="$NEON_CONNECTION_STRING" \
               --parameters registryServer="$IMAGE_REGISTRY" \
               --parameters registryAuthenticationEnabled="$GHCR_AUTH_ENABLED" \
               --parameters registryUsername="${{ vars.GHCR_USERNAME || github.actor }}" \
@@ -292,9 +303,15 @@ jobs:
               --parameters webImage="$IMAGE_REGISTRY/$owner/stayflow-web:${{ env.IMAGE_TAG }}" \
               --parameters siteUrl="$WEB_URL" \
               --parameters oidcAuthority="$API_URL" \
-              --parameters adminEmail="${{ secrets.STAYFLOW_ADMIN_EMAIL }}" \
-              --parameters adminPassword="${{ secrets.STAYFLOW_ADMIN_PASSWORD }}" \
-              --parameters serviceClientSecret="${{ secrets.STAYFLOW_SERVICE_CLIENT_SECRET }}" \
+              --parameters adminEmail="$STAYFLOW_ADMIN_EMAIL" \
+              --parameters adminPassword="$STAYFLOW_ADMIN_PASSWORD" \
+              --parameters serviceClientSecret="$STAYFLOW_SERVICE_CLIENT_SECRET" \
+              --parameters googleClientId="$GOOGLE_OAUTH_CLIENT_ID" \
+              --parameters googleClientSecret="$GOOGLE_OAUTH_CLIENT_SECRET" \
+              --parameters microsoftClientId="$MICROSOFT_OAUTH_CLIENT_ID" \
+              --parameters microsoftClientSecret="$MICROSOFT_OAUTH_CLIENT_SECRET" \
+              --parameters facebookAppId="$FACEBOOK_APP_ID" \
+              --parameters facebookAppSecret="$FACEBOOK_APP_SECRET" \
               --parameters minReplicas=0
 
       - name: Post-deployment smoke test

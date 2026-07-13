@@ -19,9 +19,10 @@ namespace StayFlow.Api.Controllers;
 /// </summary>
 public sealed class AccountController(
     SignInManager<ApplicationUser> signInManager,
-    UserManager<ApplicationUser> userManager) : ControllerBase
+    UserManager<ApplicationUser> userManager,
+    IAuthenticationSchemeProvider schemeProvider) : ControllerBase
 {
-    private static readonly string[] SupportedExternalProviders = ["Google", "Microsoft", "GitHub"];
+    private static readonly string[] SupportedExternalProviders = ["Google", "Microsoft", "Facebook", "GitHub"];
 
 
     /// <summary>
@@ -58,9 +59,26 @@ public sealed class AccountController(
         return SafeRedirect(returnUrl: null);
     }
 
-    [HttpGet("~/account/external")]
-    public IActionResult External(string provider, string? returnUrl = null)
+    [HttpGet("~/account/external/providers")]
+    public async Task<ActionResult<IReadOnlyList<ExternalProviderDto>>> ExternalProviders()
     {
+        var schemes = await schemeProvider.GetAllSchemesAsync();
+        var configured = schemes.Select(scheme => scheme.Name).ToHashSet(StringComparer.Ordinal);
+        return Ok(SupportedExternalProviders
+            .Where(configured.Contains)
+            .Select(provider => new ExternalProviderDto(provider, provider == "Microsoft" ? "Microsoft" : provider))
+            .ToList());
+    }
+
+    [HttpGet("~/account/external")]
+    public async Task<IActionResult> External(string provider, string? returnUrl = null)
+    {
+        var scheme = await schemeProvider.GetSchemeAsync(provider);
+        if (!SupportedExternalProviders.Contains(provider, StringComparer.Ordinal) || scheme is null)
+        {
+            return BadRequest("The requested external sign-in provider is unavailable.");
+        }
+
         var redirectUrl = Url.Action(nameof(ExternalCallback), "Account", new { returnUrl });
         var properties = signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
         return Challenge(properties, provider);
@@ -77,7 +95,7 @@ public sealed class AccountController(
 
         // Already linked: sign in directly.
         var signIn = await signInManager.ExternalLoginSignInAsync(
-            info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: true);
+            info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: false);
         if (signIn.Succeeded)
         {
             return SafeRedirect(returnUrl);
@@ -91,27 +109,41 @@ public sealed class AccountController(
         }
 
         var user = await userManager.FindByEmailAsync(email);
-        if (user is null)
+        if (user is not null)
         {
-            user = new ApplicationUser
-            {
-                UserName = email,
-                Email = email,
-                EmailConfirmed = true,
-                FullName = info.Principal.FindFirstValue(ClaimTypes.Name) ?? email,
-                TenantId = Guid.Empty,
-            };
-
-            var created = await userManager.CreateAsync(user);
-            if (!created.Succeeded)
-            {
-                return SafeRedirect("/");
-            }
-
-            await userManager.AddToRoleAsync(user, Roles.Customer);
+            // Never attach a new social identity to an existing account based only on an email
+            // claim. Account linking requires an authenticated, explicit flow.
+            return SafeRedirect("/");
         }
 
-        await userManager.AddLoginAsync(user, info);
+        user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true,
+            FullName = info.Principal.FindFirstValue(ClaimTypes.Name) ?? email,
+            TenantId = Guid.Empty,
+        };
+
+        var created = await userManager.CreateAsync(user);
+        if (!created.Succeeded)
+        {
+            return SafeRedirect("/");
+        }
+
+        var roleAdded = await userManager.AddToRoleAsync(user, Roles.Customer);
+        if (!roleAdded.Succeeded)
+        {
+            await userManager.DeleteAsync(user);
+            return SafeRedirect("/");
+        }
+
+        var linked = await userManager.AddLoginAsync(user, info);
+        if (!linked.Succeeded)
+        {
+            await userManager.DeleteAsync(user);
+            return SafeRedirect("/");
+        }
         await signInManager.SignInAsync(user, isPersistent: false);
         return SafeRedirect(returnUrl);
     }
@@ -119,4 +151,6 @@ public sealed class AccountController(
     // Only ever redirect to local URLs or the configured frontend, to avoid open-redirect abuse.
     private LocalRedirectResult SafeRedirect(string? returnUrl)
         => LocalRedirect(!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/");
+
+    public sealed record ExternalProviderDto(string Scheme, string DisplayName);
 }

@@ -13,17 +13,17 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 205 88% 22%;
+    --primary: 158 48% 20%;
     --primary-foreground: 43 70% 96%;
 
-    --secondary: 196 42% 92%;
-    --secondary-foreground: 205 88% 18%;
+    --secondary: 145 24% 91%;
+    --secondary-foreground: 158 48% 16%;
 
     --muted: 42 35% 93%;
     --muted-foreground: 218 18% 39%;
 
-    --accent: 32 94% 88%;
-    --accent-foreground: 205 88% 18%;
+    --accent: 24 70% 84%;
+    --accent-foreground: 158 48% 16%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
@@ -36,7 +36,7 @@
 
     --border: 210 25% 87%;
     --input: 210 25% 87%;
-    --ring: 198 87% 32%;
+    --ring: 158 48% 28%;
 
     --radius: 0.6rem;
   }
@@ -51,7 +51,7 @@
     --popover: 222.2 47% 7%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 191 86% 64%;
+    --primary: 145 42% 64%;
     --primary-foreground: 222 47% 8%;
 
     --secondary: 214 35% 18%;
@@ -60,7 +60,7 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 32 70% 26%;
+    --accent: 24 48% 30%;
     --accent-foreground: 43 55% 94%;
 
     --destructive: 0 62.8% 50%;
@@ -84,9 +84,11 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    background-image:
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.12), transparent 32rem),
-      radial-gradient(circle at top right, hsl(var(--accent) / 0.18), transparent 28rem);
+    background-image: radial-gradient(
+      circle at top right,
+      hsl(var(--accent) / 0.14),
+      transparent 30rem
+    );
     font-feature-settings:
       "rlig" 1,
       "calt" 1;

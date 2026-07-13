@@ -4,6 +4,7 @@ import Image from "next/image";
 import { MapPin, Star } from "lucide-react";
 import { money } from "@/lib/format";
 import { getHotels } from "@/content/hotels";
+import { getLocale } from "@/i18n/server";
 
 export const metadata: Metadata = {
   title: "Hotels",
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function HotelsPage() {
-  const hotels = await getHotels();
+  const [hotels, locale] = await Promise.all([getHotels(), getLocale()]);
 
   return (
     <main
@@ -24,9 +25,14 @@ export default async function HotelsPage() {
       className="mx-auto max-w-7xl px-4 py-12 sm:px-6"
     >
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Find your stay</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {locale === "es" ? "Encuentra tu estancia" : "Find your stay"}
+        </h1>
         <p className="mt-1 text-muted-foreground">
-          {hotels.length} properties powered by StayFlow Cloud.
+          {hotels.length}{" "}
+          {locale === "es"
+            ? "propiedades gestionadas con StayFlow Cloud."
+            : "properties powered by StayFlow Cloud."}
         </p>
       </div>
 
@@ -62,8 +68,12 @@ export default async function HotelsPage() {
                 {hotel.description}
               </p>
               <p className="mt-3 text-sm">
-                from <span className="font-semibold">{money(hotel.fromRate)}</span>
-                <span className="text-muted-foreground"> / night</span>
+                {locale === "es" ? "desde" : "from"}{" "}
+                <span className="font-semibold">{money(hotel.fromRate)}</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  / {locale === "es" ? "noche" : "night"}
+                </span>
               </p>
             </div>
           </Link>

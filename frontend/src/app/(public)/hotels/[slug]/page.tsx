@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { money } from "@/lib/format";
 import { getHotelBySlug, getHotelSlugs } from "@/content/hotels";
+import { getLocale } from "@/i18n/server";
 
 export const revalidate = 3600;
 
@@ -49,6 +50,7 @@ export default async function HotelDetailPage({
   const { slug } = await params;
   const hotel = await getHotelBySlug(slug);
   if (!hotel) notFound();
+  const locale = await getLocale();
 
   // Structured data for rich results.
   const jsonLd = {
@@ -77,7 +79,7 @@ export default async function HotelDetailPage({
 
       <nav className="mb-4 text-sm text-muted-foreground">
         <Link href="/hotels" className="hover:text-foreground">
-          ← All hotels
+          ← {locale === "es" ? "Todos los hoteles" : "All hotels"}
         </Link>
       </nav>
 
@@ -105,7 +107,10 @@ export default async function HotelDetailPage({
             <Star className="h-4 w-4 fill-warning text-warning" />
             {hotel.rating}
           </span>
-          <Badge variant="secondary">from {money(hotel.fromRate)} / night</Badge>
+          <Badge variant="secondary">
+            {locale === "es" ? "desde" : "from"} {money(hotel.fromRate)} /{" "}
+            {locale === "es" ? "noche" : "night"}
+          </Badge>
         </div>
       </div>
 
@@ -121,7 +126,9 @@ export default async function HotelDetailPage({
         </div>
       )}
 
-      <h2 className="mt-10 text-2xl font-bold tracking-tight">Rooms</h2>
+      <h2 className="mt-10 text-2xl font-bold tracking-tight">
+        {locale === "es" ? "Habitaciones" : "Rooms"}
+      </h2>
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
         {(hotel.roomTypes ?? []).map((rt) => (
           <Card key={rt.id} className="overflow-hidden">
@@ -147,10 +154,15 @@ export default async function HotelDetailPage({
                 <div className="flex items-center justify-between">
                   <p className="text-sm">
                     <span className="font-semibold">{money(rt.baseRate)}</span>
-                    <span className="text-muted-foreground"> / night</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      / {locale === "es" ? "noche" : "night"}
+                    </span>
                   </p>
                   <Button asChild size="sm">
-                    <Link href={`/book?hotel=${hotel.slug}&roomType=${rt.id}`}>Book</Link>
+                    <Link href={`/book?hotel=${hotel.slug}&roomType=${rt.id}`}>
+                      {locale === "es" ? "Reservar" : "Book"}
+                    </Link>
                   </Button>
                 </div>
               </CardContent>

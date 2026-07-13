@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { LocaleSwitcher } from "@/components/public/LocaleSwitcher";
+import { getDictionary, getLocale } from "@/i18n/server";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -19,6 +21,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; redirect?: string }>;
 }) {
   const { error, redirect } = await searchParams;
+  const [copy, locale] = await Promise.all([getDictionary(), getLocale()]);
   const message = error
     ? error.startsWith("exchange_failed_")
       ? `Exchange failed: ${error.replace("exchange_failed_", "").replace(/_/g, " ")}`
@@ -31,14 +34,15 @@ export default async function LoginPage({
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
       <div className="w-full max-w-sm rounded-xl border bg-card p-8 shadow-sm">
+        <div className="mb-4 flex justify-end">
+          <LocaleSwitcher locale={locale} />
+        </div>
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <span className="text-lg font-bold">S</span>
           </div>
-          <h1 className="text-xl font-semibold">Welcome back</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sign in to your StayFlow Cloud workspace
-          </p>
+          <h1 className="text-xl font-semibold">{copy.auth.welcome}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{copy.auth.subtitle}</p>
         </div>
 
         {message && (
@@ -54,12 +58,12 @@ export default async function LoginPage({
           href={loginHref}
           className="flex w-full items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
         >
-          Continue to sign in
+          {locale === "es" ? "Continuar para iniciar sesión" : "Continue to sign in"}
         </a>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
           <Link href="/" className="underline-offset-4 hover:underline">
-            ← Back to home
+            ← {copy.auth.back}
           </Link>
         </p>
       </div>

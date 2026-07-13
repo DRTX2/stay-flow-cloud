@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Locale } from "@/i18n/config";
 
 interface PortalNavItem {
   href: string;
@@ -28,7 +29,13 @@ function isActive(pathname: string, item: PortalNavItem): boolean {
   return item.exact ? pathname === item.href : pathname.startsWith(item.href);
 }
 
-export function PortalSidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function PortalSidebar({
+  onNavigate,
+  locale,
+}: {
+  onNavigate?: () => void;
+  locale: Locale;
+}) {
   const pathname = usePathname();
 
   return (
@@ -49,6 +56,14 @@ export function PortalSidebar({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {portalNav.map((item) => {
           const active = isActive(pathname, item);
+          const label =
+            locale === "es"
+              ? ({
+                  Home: "Inicio",
+                  "My Reservations": "Mis reservas",
+                  "My Profile": "Mi perfil",
+                }[item.label] ?? item.label)
+              : item.label;
           return (
             <Link
               key={item.href}
@@ -62,7 +77,7 @@ export function PortalSidebar({ onNavigate }: { onNavigate?: () => void }) {
               )}
             >
               <item.icon className="h-4 w-4 shrink-0" />
-              <span>{item.label}</span>
+              <span>{label}</span>
             </Link>
           );
         })}
@@ -73,7 +88,7 @@ export function PortalSidebar({ onNavigate }: { onNavigate?: () => void }) {
           href="/dashboard"
           className="text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
-          ← Back to Dashboard
+          ← {locale === "es" ? "Volver al panel" : "Back to Dashboard"}
         </Link>
       </div>
     </div>

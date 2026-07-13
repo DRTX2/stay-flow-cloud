@@ -7,8 +7,10 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserMenu, type UserMenuUser } from "@/components/layout/UserMenu";
 import { PortalSidebar } from "./PortalSidebar";
+import { LocaleSwitcher } from "@/components/public/LocaleSwitcher";
+import type { Locale } from "@/i18n/config";
 
-function PortalTopbar({ user }: { user: UserMenuUser }) {
+function PortalTopbar({ user, locale }: { user: UserMenuUser; locale: Locale }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -27,7 +29,7 @@ function PortalTopbar({ user }: { user: UserMenuUser }) {
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <PortalSidebar onNavigate={() => setMobileOpen(false)} />
+          <PortalSidebar locale={locale} onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
 
@@ -37,6 +39,7 @@ function PortalTopbar({ user }: { user: UserMenuUser }) {
 
       <div className="ml-auto flex items-center gap-1.5">
         <ThemeToggle />
+        <LocaleSwitcher locale={locale} />
         <UserMenu user={user} />
       </div>
     </header>
@@ -49,21 +52,23 @@ function PortalTopbar({ user }: { user: UserMenuUser }) {
  */
 export function PortalShell({
   user,
+  locale,
   children,
 }: {
   user: UserMenuUser;
+  locale: Locale;
   children: ReactNode;
 }) {
   return (
     <div className="flex min-h-screen w-full bg-muted/30">
       <aside className="hidden w-64 shrink-0 border-r bg-background md:block">
         <div className="sticky top-0 h-screen">
-          <PortalSidebar />
+          <PortalSidebar locale={locale} />
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <PortalTopbar user={user} />
+        <PortalTopbar user={user} locale={locale} />
         <main className="flex-1 p-4 sm:p-6">
           <div className="mx-auto w-full max-w-5xl">{children}</div>
         </main>

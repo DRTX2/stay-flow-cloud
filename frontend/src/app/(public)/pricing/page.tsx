@@ -4,14 +4,13 @@ import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { getLocale } from "@/i18n/server";
 
 export const metadata: Metadata = {
   title: "Pricing",
   description:
     "Simple, transparent pricing for StayFlow Cloud — from independent properties to hotel groups.",
 };
-
-export const dynamic = "force-static";
 
 const PLANS = [
   {
@@ -60,7 +59,58 @@ const PLANS = [
   },
 ];
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const locale = await getLocale();
+  const plans =
+    locale === "es"
+      ? [
+          {
+            name: "Básico",
+            price: "$0",
+            cadence: "/ mes",
+            blurb: "Para una propiedad que comienza.",
+            features: [
+              "1 propiedad",
+              "Reservas y recepción",
+              "Hasta 50 habitaciones",
+              "Soporte por correo",
+            ],
+            cta: "Comenzar gratis",
+            featured: false,
+          },
+          {
+            name: "Pro",
+            price: "$149",
+            cadence: "/ mes",
+            blurb:
+              "Para propiedades en crecimiento que necesitan analítica y facturación.",
+            features: [
+              "Hasta 5 propiedades",
+              "Facturación",
+              "Analítica ejecutiva",
+              "Almacenamiento de documentos",
+              "Soporte prioritario",
+            ],
+            cta: "Elegir Pro",
+            featured: true,
+          },
+          {
+            name: "Empresarial",
+            price: "Personalizado",
+            cadence: "",
+            blurb: "Para grupos hoteleros con necesidades avanzadas.",
+            features: [
+              "Propiedades ilimitadas",
+              "SSO y RBAC avanzado",
+              "Auditoría y cumplimiento",
+              "Integraciones personalizadas",
+              "Gestor de éxito dedicado",
+            ],
+            cta: "Contactar ventas",
+            featured: false,
+          },
+        ]
+      : PLANS;
   return (
     <main
       id="main-content"
@@ -69,15 +119,19 @@ export default function PricingPage() {
     >
       <div className="mx-auto max-w-2xl text-center">
         <h1 className="text-4xl font-bold tracking-tight">
-          Pricing that scales with you
+          {locale === "es"
+            ? "Precios que crecen contigo"
+            : "Pricing that scales with you"}
         </h1>
         <p className="mt-3 text-lg text-muted-foreground">
-          Start free, upgrade as you grow. No hidden fees.
+          {locale === "es"
+            ? "Comienza gratis y mejora a medida que creces. Sin cargos ocultos."
+            : "Start free, upgrade as you grow. No hidden fees."}
         </p>
       </div>
 
       <div className="mt-12 grid gap-6 lg:grid-cols-3">
-        {PLANS.map((plan) => (
+        {plans.map((plan) => (
           <Card
             key={plan.name}
             className={cn(
@@ -87,7 +141,7 @@ export default function PricingPage() {
             <CardHeader>
               {plan.featured && (
                 <span className="mb-2 w-fit rounded-full bg-primary px-2.5 py-0.5 text-xs font-medium text-primary-foreground">
-                  Most popular
+                  {locale === "es" ? "Más popular" : "Most popular"}
                 </span>
               )}
               <h2 className="text-lg font-semibold">{plan.name}</h2>

@@ -27,6 +27,14 @@ Use `.github/workflows/deploy-azure.yml`. Required GitHub repository secrets:
 | `STAYFLOW_SERVICE_CLIENT_SECRET` | Seeded service-to-service OAuth client secret |
 | `GHCR_READ_TOKEN` | GitHub token/PAT with `read:packages` for private GHCR packages |
 
+Optional social sign-in secrets (a provider stays disabled unless both values are present):
+
+| Provider | GitHub environment secrets | Production callback |
+|---|---|---|
+| Google | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | `${AZURE_API_URL}/signin-google` |
+| Microsoft | `MICROSOFT_OAUTH_CLIENT_ID`, `MICROSOFT_OAUTH_CLIENT_SECRET` | `${AZURE_API_URL}/signin-microsoft` |
+| Facebook | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | `${AZURE_API_URL}/signin-facebook` |
+
 Optional GitHub repository variables:
 
 | Variable | Default |

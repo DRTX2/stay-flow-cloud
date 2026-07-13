@@ -64,11 +64,38 @@ param adminPassword string
 @description('Confidential client secret used for service-to-service OAuth clients seeded in production.')
 param serviceClientSecret string
 
+@secure()
+@description('Optional Google OAuth client id.')
+param googleClientId string = ''
+
+@secure()
+@description('Optional Google OAuth client secret.')
+param googleClientSecret string = ''
+
+@secure()
+@description('Optional Microsoft OAuth client id.')
+param microsoftClientId string = ''
+
+@secure()
+@description('Optional Microsoft OAuth client secret.')
+param microsoftClientSecret string = ''
+
+@secure()
+@description('Optional Facebook Login app id.')
+param facebookAppId string = ''
+
+@secure()
+@description('Optional Facebook Login app secret.')
+param facebookAppSecret string = ''
+
 var normalizedName = toLower(replace(environmentName, '_', '-'))
 var apiAppName = '${normalizedName}-api'
 var webAppName = '${normalizedName}-web'
 var postgresConnectionString = neonConnectionString
 var registryPasswordSecretName = 'container-registry-password'
+var googleEnabled = !empty(googleClientId) && !empty(googleClientSecret)
+var microsoftEnabled = !empty(microsoftClientId) && !empty(microsoftClientSecret)
+var facebookEnabled = !empty(facebookAppId) && !empty(facebookAppSecret)
 var registryConfiguration = registryAuthenticationEnabled ? [
   {
     server: registryServer
@@ -106,6 +133,15 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
           name: registryPasswordSecretName
           value: registryPassword
         }
+      ] : [], googleEnabled ? [
+        { name: 'google-client-id', value: googleClientId }
+        { name: 'google-client-secret', value: googleClientSecret }
+      ] : [], microsoftEnabled ? [
+        { name: 'microsoft-client-id', value: microsoftClientId }
+        { name: 'microsoft-client-secret', value: microsoftClientSecret }
+      ] : [], facebookEnabled ? [
+        { name: 'facebook-app-id', value: facebookAppId }
+        { name: 'facebook-app-secret', value: facebookAppSecret }
       ] : [])
     }
     template: {
@@ -113,7 +149,7 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
         {
           name: 'api'
           image: apiImage
-          env: [
+          env: concat([
             {
               name: 'ASPNETCORE_ENVIRONMENT'
               value: 'Production'
@@ -125,6 +161,10 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'Authentication__FrontendLoginUrl'
               value: '${siteUrl}/signin'
+            }
+            {
+              name: 'FrontendOrigin'
+              value: siteUrl
             }
             {
               name: 'Authentication__Issuer'
@@ -142,7 +182,16 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'Authentication__SpaPostLogoutRedirectUris__0'
               value: '${siteUrl}/'
             }
-          ]
+          ], googleEnabled ? [
+            { name: 'Authentication__Google__ClientId', secretRef: 'google-client-id' }
+            { name: 'Authentication__Google__ClientSecret', secretRef: 'google-client-secret' }
+          ] : [], microsoftEnabled ? [
+            { name: 'Authentication__Microsoft__ClientId', secretRef: 'microsoft-client-id' }
+            { name: 'Authentication__Microsoft__ClientSecret', secretRef: 'microsoft-client-secret' }
+          ] : [], facebookEnabled ? [
+            { name: 'Authentication__Facebook__AppId', secretRef: 'facebook-app-id' }
+            { name: 'Authentication__Facebook__AppSecret', secretRef: 'facebook-app-secret' }
+          ] : [])
           probes: [
             {
               type: 'Liveness'

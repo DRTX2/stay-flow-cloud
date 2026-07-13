@@ -206,7 +206,7 @@ public static class DependencyInjection
 
     /// <summary>
     /// Registers external identity providers, each only when its credentials are configured (under
-    /// Authentication:Google|Microsoft|GitHub), so the app builds and runs without any social setup.
+    /// Authentication:Google|Microsoft|Facebook|GitHub), so the app runs without social credentials.
     /// All providers sign in through the external cookie, which the account callback then links to a
     /// local user.
     /// </summary>
@@ -236,6 +236,18 @@ public static class DependencyInjection
                 options.ClientId = microsoftId;
                 options.ClientSecret = microsoftSecret;
                 options.SignInScheme = IdentityConstants.ExternalScheme;
+            });
+        }
+
+        var facebook = configuration.GetSection("Authentication:Facebook");
+        if (facebook["AppId"] is { Length: > 0 } facebookId && facebook["AppSecret"] is { Length: > 0 } facebookSecret)
+        {
+            authentication.AddFacebook(options =>
+            {
+                options.AppId = facebookId;
+                options.AppSecret = facebookSecret;
+                options.SignInScheme = IdentityConstants.ExternalScheme;
+                options.Fields.Add("email");
             });
         }
 

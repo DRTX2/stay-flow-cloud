@@ -9,8 +9,10 @@ import { Sidebar } from "./Sidebar";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserMenu, type UserMenuUser } from "./UserMenu";
 import { useShell } from "./shell-context";
+import { LocaleSwitcher } from "@/components/public/LocaleSwitcher";
+import type { Locale } from "@/i18n/config";
 
-export function Topbar({ user }: { user: UserMenuUser }) {
+export function Topbar({ user, locale }: { user: UserMenuUser; locale: Locale }) {
   const { collapsed, toggleCollapsed, setCommandOpen } = useShell();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -30,7 +32,11 @@ export function Topbar({ user }: { user: UserMenuUser }) {
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <Sidebar collapsed={false} onNavigate={() => setMobileOpen(false)} />
+          <Sidebar
+            collapsed={false}
+            locale={locale}
+            onNavigate={() => setMobileOpen(false)}
+          />
         </SheetContent>
       </Sheet>
 
@@ -65,6 +71,7 @@ export function Topbar({ user }: { user: UserMenuUser }) {
           </kbd>
         </Button>
         <ThemeToggle />
+        <LocaleSwitcher locale={locale} />
         <UserMenu user={user} />
       </div>
     </header>

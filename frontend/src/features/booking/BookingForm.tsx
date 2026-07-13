@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { money } from "@/lib/format";
 import { createBookingAction } from "@/app/(public)/book/actions";
+import type { Locale } from "@/i18n/config";
 
 export interface BookingHotel {
   slug: string;
@@ -33,32 +34,50 @@ export interface BookingHotel {
   roomTypes: { id: string; name: string; baseRate: number; maxOccupancy?: number }[];
 }
 
-const schema = z
-  .object({
-    hotelSlug: z.string().min(1, "Select a hotel"),
-    roomTypeId: z.string().min(1, "Select a room"),
-    checkIn: z.string().min(1, "Required"),
-    checkOut: z.string().min(1, "Required"),
-    guests: z.coerce.number().int().min(1, "At least 1").max(20),
-    fullName: z.string().min(2, "Enter your name"),
-    email: z.string().email("Enter a valid email"),
-    phone: z.string().optional(),
-  })
-  .refine((v) => v.checkOut > v.checkIn, {
-    message: "Check-out must be after check-in",
-    path: ["checkOut"],
-  });
+const createSchema = (locale: Locale) =>
+  z
+    .object({
+      hotelSlug: z
+        .string()
+        .min(1, locale === "es" ? "Selecciona un hotel" : "Select a hotel"),
+      roomTypeId: z
+        .string()
+        .min(1, locale === "es" ? "Selecciona una habitación" : "Select a room"),
+      checkIn: z.string().min(1, locale === "es" ? "Obligatorio" : "Required"),
+      checkOut: z.string().min(1, locale === "es" ? "Obligatorio" : "Required"),
+      guests: z.coerce
+        .number()
+        .int()
+        .min(1, locale === "es" ? "Mínimo 1" : "At least 1")
+        .max(20),
+      fullName: z
+        .string()
+        .min(2, locale === "es" ? "Escribe tu nombre" : "Enter your name"),
+      email: z
+        .string()
+        .email(locale === "es" ? "Escribe un correo válido" : "Enter a valid email"),
+      phone: z.string().optional(),
+    })
+    .refine((v) => v.checkOut > v.checkIn, {
+      message:
+        locale === "es"
+          ? "La salida debe ser posterior a la llegada"
+          : "Check-out must be after check-in",
+      path: ["checkOut"],
+    });
 
-type FormValues = z.infer<typeof schema>;
+type FormValues = z.infer<ReturnType<typeof createSchema>>;
 
 export function BookingForm({
   hotels,
   initialHotel,
   initialRoomType,
+  locale,
 }: {
   hotels: BookingHotel[];
   initialHotel?: string;
   initialRoomType?: string;
+  locale: Locale;
 }) {
   const [pending, startTransition] = useTransition();
   const [reference, setReference] = useState<string | null>(null);
@@ -68,7 +87,7 @@ export function BookingForm({
   );
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(createSchema(locale)),
     defaultValues: {
       hotelSlug: initialHotelRecord?.slug ?? "",
       roomTypeId: validInitialRoomType ? (initialRoomType ?? "") : "",
@@ -95,9 +114,16 @@ export function BookingForm({
       const result = await createBookingAction(values);
       if (result.ok) {
         setReference(result.reference ?? "received");
-        toast.success("Booking request sent");
+        toast.success(
+          locale === "es" ? "Solicitud de reserva enviada" : "Booking request sent",
+        );
       } else {
-        toast.error(result.error ?? "Could not submit your booking");
+        toast.error(
+          result.error ??
+            (locale === "es"
+              ? "No se pudo enviar tu reserva"
+              : "Could not submit your booking"),
+        );
       }
     });
   }
@@ -111,10 +137,13 @@ export function BookingForm({
           className="flex flex-col items-center gap-3 p-6 text-center sm:p-10"
         >
           <CheckCircle2 className="h-12 w-12 text-success" />
-          <h2 className="text-xl font-semibold">Request received</h2>
+          <h2 className="text-xl font-semibold">
+            {locale === "es" ? "Solicitud recibida" : "Request received"}
+          </h2>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Thanks! Your booking enquiry has been sent. Our team will confirm availability
-            shortly. Your reference is:
+            {locale === "es"
+              ? "Gracias. Enviamos tu solicitud y nuestro equipo confirmará pronto la disponibilidad. Tu referencia es:"
+              : "Thanks! Your booking enquiry has been sent. Our team will confirm availability shortly. Your reference is:"}
           </p>
           <p className="rounded-md border bg-muted px-3 py-1.5 font-mono text-sm">
             {reference}
@@ -144,7 +173,11 @@ export function BookingForm({
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a hotel" />
+                        <SelectValue
+                          placeholder={
+                            locale === "es" ? "Selecciona un hotel" : "Select a hotel"
+                          }
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -165,7 +198,9 @@ export function BookingForm({
               name="roomTypeId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Room type</FormLabel>
+                  <FormLabel>
+                    {locale === "es" ? "Tipo de habitación" : "Room type"}
+                  </FormLabel>
                   <Select
                     value={field.value}
                     onValueChange={field.onChange}
@@ -173,13 +208,20 @@ export function BookingForm({
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a room" />
+                        <SelectValue
+                          placeholder={
+                            locale === "es"
+                              ? "Selecciona una habitación"
+                              : "Select a room"
+                          }
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {roomTypes.map((rt) => (
                         <SelectItem key={rt.id} value={rt.id}>
-                          {rt.name} · {money(rt.baseRate)} / night
+                          {rt.name} · {money(rt.baseRate)} /{" "}
+                          {locale === "es" ? "noche" : "night"}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -195,7 +237,7 @@ export function BookingForm({
                 name="checkIn"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Check-in</FormLabel>
+                    <FormLabel>{locale === "es" ? "Llegada" : "Check-in"}</FormLabel>
                     <FormControl>
                       <Input type="date" min={minimumDate} {...field} />
                     </FormControl>
@@ -208,7 +250,7 @@ export function BookingForm({
                 name="checkOut"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Check-out</FormLabel>
+                    <FormLabel>{locale === "es" ? "Salida" : "Check-out"}</FormLabel>
                     <FormControl>
                       <Input type="date" min={minimumDate} {...field} />
                     </FormControl>
@@ -223,7 +265,7 @@ export function BookingForm({
               name="guests"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Guests</FormLabel>
+                  <FormLabel>{locale === "es" ? "Huéspedes" : "Guests"}</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -235,7 +277,8 @@ export function BookingForm({
                   <FormMessage />
                   {selectedRoomType?.maxOccupancy && (
                     <p className="text-xs text-muted-foreground">
-                      Maximum occupancy: {selectedRoomType.maxOccupancy}
+                      {locale === "es" ? "Ocupación máxima" : "Maximum occupancy"}:{" "}
+                      {selectedRoomType.maxOccupancy}
                     </p>
                   )}
                 </FormItem>
@@ -247,7 +290,9 @@ export function BookingForm({
               name="fullName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full name</FormLabel>
+                  <FormLabel>
+                    {locale === "es" ? "Nombre completo" : "Full name"}
+                  </FormLabel>
                   <FormControl>
                     <Input placeholder="Jane Doe" {...field} />
                   </FormControl>
@@ -275,7 +320,9 @@ export function BookingForm({
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone (optional)</FormLabel>
+                    <FormLabel>
+                      {locale === "es" ? "Teléfono (opcional)" : "Phone (optional)"}
+                    </FormLabel>
                     <FormControl>
                       <Input type="tel" placeholder="+1 555 000 0000" {...field} />
                     </FormControl>
@@ -292,7 +339,13 @@ export function BookingForm({
               aria-busy={pending}
             >
               {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {pending ? "Sending request..." : "Request booking"}
+              {pending
+                ? locale === "es"
+                  ? "Enviando solicitud..."
+                  : "Sending request..."
+                : locale === "es"
+                  ? "Solicitar reserva"
+                  : "Request booking"}
             </Button>
           </form>
         </Form>

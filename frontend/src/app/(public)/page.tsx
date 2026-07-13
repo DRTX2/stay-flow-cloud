@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { money } from "@/lib/format";
 import { getHotels } from "@/content/hotels";
+import { getDictionary, getLocale } from "@/i18n/server";
 
 // Marketing landing is fully static (SSG).
 export const dynamic = "force-static";
@@ -44,8 +45,40 @@ const METRICS = [
 ];
 
 export default async function MarketingPage() {
-  const hotels = await getHotels();
+  const [hotels, dictionary, locale] = await Promise.all([
+    getHotels(),
+    getDictionary(),
+    getLocale(),
+  ]);
   const featured = hotels.slice(0, 3);
+  const flows =
+    locale === "es"
+      ? [
+          {
+            icon: Hotel,
+            title: "Configura una propiedad",
+            body: "Define habitaciones, tipos, tarifas, servicios, roles y módulos para un hotel o grupo.",
+          },
+          {
+            icon: CalendarCheck,
+            title: "De la reserva al checkout",
+            body: "Gestiona huésped, reserva, check-in, servicios, factura y salida desde un solo flujo.",
+          },
+          {
+            icon: ClipboardList,
+            title: "Opera cada día",
+            body: "Coordina housekeeping, mantenimiento, habitaciones, órdenes y visibilidad operativa.",
+          },
+        ]
+      : PRODUCT_FLOWS;
+  const metrics =
+    locale === "es"
+      ? [
+          { value: "24/7", label: "visibilidad de recepción" },
+          { value: "8+", label: "flujos conectados" },
+          { value: "0", label: "hojas de cálculo" },
+        ]
+      : METRICS;
 
   return (
     <main id="main-content" tabIndex={-1} className="overflow-hidden">
@@ -54,20 +87,18 @@ export default async function MarketingPage() {
         <div className="absolute left-1/2 top-10 -z-10 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
         <div>
           <p className="mb-5 w-fit rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-primary shadow-sm backdrop-blur">
-            Modern hotel operating system
+            {dictionary.home.eyebrow}
           </p>
           <h1 className="max-w-3xl text-balance text-5xl font-black tracking-tight text-foreground sm:text-7xl">
-            Run every stay from booking to checkout.
+            {dictionary.home.title}
           </h1>
           <p className="mt-6 max-w-2xl text-balance text-lg leading-8 text-muted-foreground">
-            StayFlow Cloud connects public booking, reservations, front desk,
-            housekeeping, billing and guest self-service in one production-ready operating
-            layer for hotels.
+            {dictionary.home.description}
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <Button asChild size="lg" className="shadow-lg shadow-primary/20">
               <Link href="/hotels">
-                Start a booking <ArrowRight className="ml-2 h-4 w-4" />
+                {dictionary.home.booking} <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
             <Button
@@ -76,11 +107,11 @@ export default async function MarketingPage() {
               variant="outline"
               className="bg-background/70 backdrop-blur"
             >
-              <Link href="/dashboard">Open operator dashboard</Link>
+              <Link href="/dashboard">{dictionary.home.operator}</Link>
             </Button>
           </div>
           <div className="mt-10 grid max-w-xl gap-3 sm:grid-cols-3">
-            {METRICS.map((metric) => (
+            {metrics.map((metric) => (
               <div
                 key={metric.label}
                 className="rounded-2xl border bg-card/75 p-4 shadow-sm backdrop-blur"
@@ -100,19 +131,26 @@ export default async function MarketingPage() {
             <div className="overflow-hidden rounded-[1.5rem] border bg-background">
               <div className="flex items-center justify-between border-b bg-muted/40 px-5 py-4">
                 <div>
-                  <p className="text-sm font-semibold">Live operations</p>
-                  <p className="text-xs text-muted-foreground">Today at Ocean Vista</p>
+                  <p className="text-sm font-semibold">{dictionary.home.live}</p>
+                  <p className="text-xs text-muted-foreground">{dictionary.home.today}</p>
                 </div>
                 <span className="rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
-                  Stable
+                  {dictionary.home.stable}
                 </span>
               </div>
               <div className="grid gap-3 p-5">
-                {[
-                  ["Arrivals", "18", "6 VIP rooms pre-assigned"],
-                  ["Ready rooms", "42", "Housekeeping synced"],
-                  ["Open invoices", "$8.4k", "12 pending payments"],
-                ].map(([label, value, detail]) => (
+                {(locale === "es"
+                  ? [
+                      ["Llegadas", "18", "6 habitaciones VIP preasignadas"],
+                      ["Habitaciones listas", "42", "Housekeeping sincronizado"],
+                      ["Facturas abiertas", "$8.4k", "12 cobros pendientes"],
+                    ]
+                  : [
+                      ["Arrivals", "18", "6 VIP rooms pre-assigned"],
+                      ["Ready rooms", "42", "Housekeeping synced"],
+                      ["Open invoices", "$8.4k", "12 pending payments"],
+                    ]
+                ).map(([label, value, detail]) => (
                   <div
                     key={label}
                     className="flex items-center justify-between rounded-2xl border bg-card p-4 shadow-sm"
@@ -135,15 +173,12 @@ export default async function MarketingPage() {
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
           <div className="mb-8 max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight">
-              Three workflows that prove the product.
+              {dictionary.home.workflowsTitle}
             </h2>
-            <p className="mt-2 text-muted-foreground">
-              The cloud architecture, security and automation exist to make these hotel
-              workflows reliable, not to distract from them.
-            </p>
+            <p className="mt-2 text-muted-foreground">{dictionary.home.workflowsBody}</p>
           </div>
           <div className="grid gap-5 lg:grid-cols-3">
-            {PRODUCT_FLOWS.map((f) => (
+            {flows.map((f) => (
               <Card
                 key={f.title}
                 className="group border-primary/10 bg-card/80 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"
@@ -183,10 +218,10 @@ export default async function MarketingPage() {
         <div className="grid gap-5 rounded-[2rem] border bg-primary p-6 text-primary-foreground shadow-2xl shadow-primary/20 md:grid-cols-3 md:p-8">
           <div className="md:col-span-1">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary-foreground/70">
-              Built for operators
+              {dictionary.home.operators}
             </p>
             <h2 className="mt-3 text-3xl font-black tracking-tight">
-              Less admin drag. More stay control.
+              {dictionary.home.control}
             </h2>
           </div>
           <div className="grid gap-4 sm:grid-cols-3 md:col-span-2">
@@ -226,14 +261,14 @@ export default async function MarketingPage() {
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
         <div className="mb-8 flex items-end justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Featured stays</h2>
-            <p className="mt-1 text-muted-foreground">
-              A glimpse of the properties powered by StayFlow Cloud.
-            </p>
+            <h2 className="text-2xl font-bold tracking-tight">
+              {dictionary.home.featured}
+            </h2>
+            <p className="mt-1 text-muted-foreground">{dictionary.home.featuredBody}</p>
           </div>
           <Button asChild variant="ghost" className="hidden sm:inline-flex">
             <Link href="/hotels">
-              All hotels <ArrowRight className="ml-2 h-4 w-4" />
+              {dictionary.home.allHotels} <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
         </div>
@@ -266,7 +301,10 @@ export default async function MarketingPage() {
                 </p>
                 <p className="mt-2 text-sm">
                   <span className="font-semibold">{money(hotel.fromRate)}</span>
-                  <span className="text-muted-foreground"> / night</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    / {dictionary.home.night}
+                  </span>
                 </p>
               </div>
             </Link>

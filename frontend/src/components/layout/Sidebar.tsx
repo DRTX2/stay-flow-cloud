@@ -6,6 +6,29 @@ import { Hotel } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navSections, type NavItem } from "./nav";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { Locale } from "@/i18n/config";
+
+const ES_LABELS: Record<string, string> = {
+  "/dashboard": "Panel diario",
+  "/dashboard/reservations": "Reservas",
+  "/dashboard/booking-enquiries": "Solicitudes",
+  "/dashboard/room-rack": "Calendario",
+  "/dashboard/rooms": "Habitaciones",
+  "/dashboard/room-types": "Tipos de habitación",
+  "/dashboard/guests": "Huéspedes",
+  "/dashboard/services": "Servicios",
+  "/dashboard/orders": "Órdenes (A&B)",
+  "/dashboard/housekeeping": "Housekeeping",
+  "/dashboard/maintenance": "Mantenimiento",
+  "/dashboard/invoices": "Facturas",
+  "/dashboard/reports": "Reportes",
+  "/dashboard/feedback": "Opiniones",
+  "/dashboard/documents": "Documentos",
+  "/dashboard/staff": "Personal y roles",
+  "/dashboard/tenant-features": "Plan y módulos",
+  "/dashboard/audit": "Auditoría",
+  "/dashboard/integrations": "Integraciones",
+};
 
 function isActive(pathname: string, item: NavItem): boolean {
   return item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -13,9 +36,11 @@ function isActive(pathname: string, item: NavItem): boolean {
 
 export function Sidebar({
   collapsed,
+  locale,
   onNavigate,
 }: {
   collapsed: boolean;
+  locale: Locale;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -42,12 +67,20 @@ export function Sidebar({
           <div key={section.title}>
             {!collapsed && (
               <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {section.title}
+                {locale === "es"
+                  ? section.title === "Overview"
+                    ? "Resumen"
+                    : section.title === "Operations"
+                      ? "Operación"
+                      : "Administración"
+                  : section.title}
               </p>
             )}
             <ul className="space-y-1">
               {section.items.map((item) => {
                 const active = isActive(pathname, item);
+                const label =
+                  locale === "es" ? (ES_LABELS[item.href] ?? item.label) : item.label;
                 const link = (
                   <Link
                     href={item.href}
@@ -61,7 +94,7 @@ export function Sidebar({
                     )}
                   >
                     <item.icon className="h-4 w-4 shrink-0" />
-                    {!collapsed && <span>{item.label}</span>}
+                    {!collapsed && <span>{label}</span>}
                   </Link>
                 );
                 return (
@@ -69,7 +102,7 @@ export function Sidebar({
                     {collapsed ? (
                       <Tooltip>
                         <TooltipTrigger asChild>{link}</TooltipTrigger>
-                        <TooltipContent side="right">{item.label}</TooltipContent>
+                        <TooltipContent side="right">{label}</TooltipContent>
                       </Tooltip>
                     ) : (
                       link
