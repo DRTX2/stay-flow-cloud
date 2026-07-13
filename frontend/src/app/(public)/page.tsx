@@ -17,8 +17,8 @@ import { money } from "@/lib/format";
 import { getHotels } from "@/content/hotels";
 import { getDictionary, getLocale } from "@/i18n/server";
 
-// Marketing landing is fully static (SSG).
-export const dynamic = "force-static";
+// Locale is cookie-backed, so this route must vary per request.
+export const dynamic = "force-dynamic";
 
 const PRODUCT_FLOWS = [
   {

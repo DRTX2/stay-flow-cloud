@@ -314,14 +314,34 @@ jobs:
               --parameters facebookAppSecret="$FACEBOOK_APP_SECRET" \
               --parameters minReplicas=0
 
+            for app in "$ENVIRONMENT_NAME-api" "$ENVIRONMENT_NAME-web"; do
+              for attempt in $(seq 1 60); do
+                latest=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$app" --query properties.latestRevisionName --output tsv)
+                ready=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$app" --query properties.latestReadyRevisionName --output tsv)
+                if [ -n "$latest" ] && [ "$latest" = "$ready" ]; then
+                  echo "$app revision ready: $ready"
+                  break
+                fi
+                if [ "$attempt" -eq 60 ]; then
+                  echo "$app did not activate revision $latest within 10 minutes. Last ready revision: $ready"
+                  exit 1
+                fi
+                sleep 10
+              done
+            done
+
       - name: Post-deployment smoke test
         env:
           STAGING_API_URL: ${{ vars.AZURE_API_URL }}
           SMOKE_CLIENT_ID: stayflow-service
           SMOKE_CLIENT_SECRET: ${{ secrets.STAYFLOW_SERVICE_CLIENT_SECRET }}
+          MICROSOFT_OAUTH_CLIENT_ID: ${{ secrets.MICROSOFT_OAUTH_CLIENT_ID }}
         run: |
           bash scripts/staging-smoke.sh
           curl -fsS "$WEB_URL" >/dev/null
+          if [ -n "$MICROSOFT_OAUTH_CLIENT_ID" ]; then
+            curl -fsS "$STAGING_API_URL/account/external/providers" | jq -e 'any(.[]; .scheme == "Microsoft")' >/dev/null
+          fi
 
       - name: Deployment summary
         run: |
